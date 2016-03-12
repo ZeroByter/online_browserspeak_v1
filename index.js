@@ -1,4 +1,4 @@
-var websocket = new WebSocket("ws://213.57.241.208:8080") //Make the websocket connection
+var websocket = new WebSocket("ws://127.0.0.1:8080") //Make the websocket connection
 
 //Client stored settings
 var username = ""//The username
@@ -48,7 +48,7 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	
 	if(type == "get_channels"){
 		$.each(ws_msg.channels, function(i, v){
-			add_channel(v["name"], i)
+			add_channel(v["name"], i, i == ws_msg.active_channel)
 		})
 	}
 	
@@ -62,7 +62,7 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	}
 	
 	if(type == "user_change_name"){
-		remove_user(ws_msg.id)
+		user_change_name(ws_msg.id, ws_msg.new_name)
 	}
 	
 	if(type == "user_disconnected"){
@@ -70,22 +70,39 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	}
 }
 
-function add_channel(name, id){ //Add a channel to the channels div
-	$("#channels_div").append("<span class=\"channel\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\">Channel: " + name + "</span><br>")
-	$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\"></span><br>")
+function add_channel(name, id, active_channel){ //Add a channel to the channels div
+	var active_channel_str = ""
+	if(active_channel){
+		active_channel_str = "active_channel"
+	}
+	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\">Channel: " + name + "</span>")
+	$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\"></span>")
 	return true
 }
 
 function add_user_to_channel(channel_id, user_properties){
-	$(".channel_users").data("id", channel_id).append("<span class=\"user\" data-id=\"" + user_properties["id"] + "\">" + user_properties["name"] + "</span>")
+	$(".channel_users").each(function(){
+		if($(this).data("id") == channel_id){
+			$(this).html("")
+			$(this).append("<span class=\"user\" data-id=\"" + user_properties["id"] + "\">" + user_properties["name"] + "</span>")
+		}
+	})
 }
 
 function user_change_name(id, new_name){
-	
+	$(".user").each(function(){
+		if($(this).data("id") == id){
+			$(this).html(new_name)
+		}
+	})
 }
 
 function remove_user(id){
-	$(".user").data("id", id).remove()
+	$(".user").each(function(){
+		if($(this).data("id") == id){
+			$(this).remove()
+		}
+	})
 }
 
 $("#chat_input").bind("keypress", function(e){ //When a user sends a message via the chat input box

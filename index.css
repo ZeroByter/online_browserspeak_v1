@@ -30,4 +30,13 @@ body{
 
 .channel{
 	text-decoration: underline;
+	display: block;
+}
+
+.channel:not(.active_channel){
+	color: blue;
+}
+
+.user{
+	display: block;
 }

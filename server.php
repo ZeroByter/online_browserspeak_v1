@@ -23,6 +23,10 @@
 			"name" => "* Default *",
 			"default" => true,
 		],
+		1 => [
+			"name" => "Test channel",
+			"default" => false,
+		],
 	];
 	$clients_info = array();
 
@@ -46,8 +50,9 @@
 			perform_handshaking($header, $socket_new, $host, $port);
 			
 			socket_getpeername($socket_new, $ip);
-			//$response = mask(json_encode(array("type"=>"user_connected", "message"=>"$ip connected")));
-			//send_message($response); //Send to everyone a general message that someone connected
+			//TO-DO: Make it so this message sends both uid of client and the channel that he connected to
+			$response = mask(json_encode(array("type"=>"user_connected", "id"=>$clients_info[get_socket_sessionid($changed_socket)]["uid"])));
+			send_message($response); //Send to everyone a general message that someone connected
 			
 			$connected_channel = $channels_array[$clients_info[get_socket_sessionid($socket_new)]["channel"]]["name"];
 			echo "$ip connected to channel '$connected_channel'\n";
@@ -88,11 +93,19 @@
 					send_message($response_text);
 				}
 				if($ws_type == "user_change_channel"){
-					//$clients_channels[get_socket_sessionid($changed_socket)] = $ws_msg->channel;
-					//echo "($ip) $ws_msg->username: switched to channel '$ws_msg->channel'\n";
+					$uid = $clients_info[get_socket_sessionid($changed_socket)]["uid"];
+					$username = $clients_info[get_socket_sessionid($changed_socket)]["username"];
+					$old_channel = $clients_info[get_socket_sessionid($changed_socket)]["channel"];
+					
+					$clients_info[get_socket_sessionid($changed_socket)]["channel"] = $ws_msg->channel;
+					echo "($ip) $username: switched to channel '$ws_msg->channel'\n";
+					
+					$response_text = mask(json_encode(array("type"=>$ws_type, "name"=>$username, "old_channel"=>$old_channel, "new_channel"=>$ws_msg->channel, "id"=>$uid)));
+					send_message($response_text);
 				}
 				if($ws_type == "get_channels"){
-					$response_text = mask(json_encode(array("type"=>$ws_type, "channels"=>$channels_array)));
+					$channel = $clients_info[get_socket_sessionid($changed_socket)]["channel"];
+					$response_text = mask(json_encode(array("type"=>$ws_type, "channels"=>$channels_array, "active_channel"=>$channel)));
 					send_message_private($changed_socket, $response_text);
 					echo "($ip) requested to get a list of channels\n";
 				}
@@ -118,14 +131,13 @@
 			if($buf === false){
 				socket_getpeername($changed_socket, $ip);
 				
-				//$response_text = mask(json_encode(array("type"=>"remove_cursor", "id"=>array_search($changed_socket, $clients))));
-				//send_message($response_text);
+				$response_text = mask(json_encode(array("type"=>"user_disconnected", "id"=>$clients_info[get_socket_sessionid($changed_socket)]["uid"])));
+				send_message($response_text);
+				
+				unset($clients_info[get_socket_sessionid($changed_socket)]);
 				
 				$found_socket = array_search($changed_socket, $clients);
 				unset($clients[$found_socket]);
-				
-				//var_dump($clients_info[get_socket_sessionid($changed_socket)]);
-				unset($clients_info[get_socket_sessionid($changed_socket)]);
 				
 				echo "$ip disconnected\n";
 			}
