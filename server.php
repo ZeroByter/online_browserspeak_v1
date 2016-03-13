@@ -43,7 +43,7 @@
 				"socket" => $socket_new,
 				"uid" => $client_uid,
 				"channel" => get_default_channel(),
-				"username" => "",
+				"username" => "Teamspeak User",
 			];
 			
 			$header = socket_read($socket_new, 1024);
@@ -51,7 +51,7 @@
 			
 			socket_getpeername($socket_new, $ip);
 			//TO-DO: Make it so this message sends both uid of client and the channel that he connected to
-			$response = mask(json_encode(array("type"=>"user_connected", "id"=>$clients_info[get_socket_sessionid($changed_socket)]["uid"])));
+			$response = mask(json_encode(array("type"=>"user_connected", "id"=>$clients_info[get_socket_sessionid($socket_new)]["uid"], "channel_id"=>$clients_info[get_socket_sessionid($socket_new)]["uid"])));
 			send_message($response); //Send to everyone a general message that someone connected
 			
 			$connected_channel = $channels_array[$clients_info[get_socket_sessionid($socket_new)]["channel"]]["name"];

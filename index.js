@@ -105,6 +105,10 @@ function remove_user(id){
 	})
 }
 
+$(".channel").on("click", function(){
+	alert("test")
+})
+
 $("#chat_input").bind("keypress", function(e){ //When a user sends a message via the chat input box
 	var code = e.keyCode || e.which
 	if(code == 13){

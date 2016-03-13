@@ -35,6 +35,7 @@ body{
 
 .channel:not(.active_channel){
 	color: blue;
+	cursor: pointer;
 }
 
 .user{
