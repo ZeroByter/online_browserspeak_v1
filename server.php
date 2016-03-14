@@ -9,7 +9,7 @@
 	echo "started on $host:$port at $start_time\n";
 	$null = NULL;
 	
-	$admin_pass = "_-zero"; //TO-DO: Better fucking security than this because this will go on GitHub and anyone could see this shit
+	$admin_pass = "_-zeroo"; //TO-DO: Better fucking security than this because this will go on GitHub and anyone could see this shit
 
 	$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 
@@ -185,6 +185,25 @@
 						$response_text = mask(json_encode(array("type"=>$ws_type, "username"=>$username, "message"=>$ws_msg->message)));
 						send_message($response_text);
 						echo "($ip) $ws_msg->username: sent a global message '" . $ws_msg->message . "' to channel '{$channels_array[$user_channel]["name"]}'\n";
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				if($ws_type == "kick_user"){
+					$username = get_sessionid_user_info(get_socket_sessionid($changed_socket))["username"];
+					$is_admin = get_sessionid_user_info(get_socket_sessionid($changed_socket))["is_admin"];
+					
+					if($is_admin){
+						$target_info = get_user_by_name($ws_msg->target_name);
+						echo "'{$target_info["username"]}' was kicked from the server by $username!\n";
+						
+						socket_shutdown($target_info["socket"], 2);
+						socket_close($target_info["socket"]);
+						unset($clients_info[get_socket_sessionid($target_info["socket"])]);
+						
+						$found_socket = array_search($target_info["socket"], $clients);
+						unset($clients[$found_socket]);
 					}else{
 						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
 						send_message_private($changed_socket, $response_text);
