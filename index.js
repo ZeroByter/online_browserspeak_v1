@@ -1,8 +1,13 @@
-var websocket = new WebSocket("ws://127.0.0.1:8080") //Make the websocket connection
+var websocket = new WebSocket("ws://213.57.241.208:8080") //Make the websocket connection
 
 //Client stored settings
 var username = ""//The username
 var username_min_length = 4 //The minimum length for a username
+
+window.onbeforeunload = function(){
+    websocket.onclose = function(){}
+    websocket.close()
+}
 
 websocket.onopen = function(){ //When the websocket connection opens
 	add_chat("system", "", "Connected to server")
@@ -42,6 +47,38 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	
 	console.log("message received -- type: " + type)
 	
+	if(type == "admin_enter"){
+		var valid = ws_msg.valid
+		var enabled = ws_msg.enabled
+		if(valid){
+			if(enabled){
+				add_chat("system", "", "Admin access granted and enabled!")
+			}else{
+				add_chat("system", "", "Admin access granted and disabled!")
+			}
+		}else{
+			add_chat("error", "", "Admin access denied!")
+		}
+	}
+	
+	if(type == "admin_name_change"){
+		var id = ws_msg.id
+		var enabled = ws_msg.enabled
+		//TO-DO: When a admin toggles on or off, send this message to all users, a message will appear in chat and name will be changed with ' [Admin]' or nothing.
+	}
+	
+	if(type == "system_message"){
+		add_chat("system", "", ws_msg.message)
+	}
+	
+	if(type == "global_message"){
+		add_chat("global", ws_msg.username, ws_msg.message)
+	}
+	
+	if(type == "error_message"){
+		add_chat("error", "", ws_msg.message)
+	}
+	
 	if(type == "user_message"){
 		add_chat("user", ws_msg.username, ws_msg.message)
 	}
@@ -49,6 +86,16 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	if(type == "get_channels"){
 		$.each(ws_msg.channels, function(i, v){
 			add_channel(v["name"], i, i == ws_msg.active_channel)
+		})
+	}
+	
+	if(type == "get_users_in_channel"){
+		clear_channel_users(ws_msg.channel)
+		$.each(ws_msg.users, function(i, v){
+			add_user_to_channel(ws_msg.channel, {
+				"id": v["id"],
+				"name": v["username"],
+			})
 		})
 	}
 	
@@ -61,12 +108,46 @@ websocket.onmessage = function(event){ //When a websocket message is received
 		})
 	}
 	
+	if(type == "user_change_channel"){
+		clear_channel_users(ws_msg.channel)
+		$.each(ws_msg.users, function(i, v){
+			add_user_to_channel(ws_msg.channel, {
+				"id": v["id"],
+				"name": v["username"],
+			})
+		})
+	}
+	
+	if(type == "client_active_channel"){
+		$(".active_channel").removeClass("active_channel")
+		$(".channel").each(function(i, v){
+			if($(this).data("id") == ws_msg.channel){
+				$(this).addClass("active_channel")
+			}
+		})
+	}
+	
 	if(type == "user_change_name"){
 		user_change_name(ws_msg.id, ws_msg.new_name)
 	}
 	
+	if(type == "user_connected"){
+		add_user_to_channel(ws_msg.channel_id, {
+			"id": ws_msg.id,
+			"name": ws_msg.username,
+		})
+	}
+	
 	if(type == "user_disconnected"){
 		remove_user(ws_msg.id)
+	}
+	
+	if(type == "remove_user"){
+		remove_user(ws_msg.id)
+	}
+	
+	if(type == "clear_channel_users"){
+		clear_channel_users(ws_msg.channel)
 	}
 }
 
@@ -80,10 +161,18 @@ function add_channel(name, id, active_channel){ //Add a channel to the channels 
 	return true
 }
 
-function add_user_to_channel(channel_id, user_properties){
+function clear_channel_users(channel_id){
 	$(".channel_users").each(function(){
 		if($(this).data("id") == channel_id){
 			$(this).html("")
+		}
+	})
+}
+
+function add_user_to_channel(channel_id, user_properties){
+	$(".channel_users").each(function(){
+		if($(this).data("id") == channel_id){
+			//$(this).html("")
 			$(this).append("<span class=\"user\" data-id=\"" + user_properties["id"] + "\">" + user_properties["name"] + "</span>")
 		}
 	})
@@ -105,8 +194,12 @@ function remove_user(id){
 	})
 }
 
-$(".channel").on("click", function(){
-	alert("test")
+$("body").on("click", ".channel:not(.active_channel)", function(){
+	var ws_msg = {
+		type: "user_change_channel",
+		channel: $(this).data("id"),
+	}
+	websocket.send(JSON.stringify(ws_msg))
 })
 
 $("#chat_input").bind("keypress", function(e){ //When a user sends a message via the chat input box
@@ -128,7 +221,7 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 			delete args_string[0]
 			args_string = args_string.join(" ").replace(" ", "")
 			
-			if(command == "username"){
+			if(command == "username"){ //Set username command
 				if(args_string.length >= username_min_length){
 					var ws_msg = {
 						type: "user_change_name",
@@ -146,7 +239,33 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 					return false
 				}
 			}
-			
+			if(command == "admin"){ //Admin login command
+				var ws_msg = {
+					type: "admin_enter",
+					password: args_string,
+				}
+				websocket.send(JSON.stringify(ws_msg))
+				$("#chat_input").val("")
+				return
+			}
+			if(command == "global"){ //Global chat command
+				var ws_msg = {
+					type: "global_message",
+					message: args_string,
+				}
+				websocket.send(JSON.stringify(ws_msg))
+				$("#chat_input").val("")
+				return
+			}
+			if(command == "bring"){ //Global chat command
+				var ws_msg = {
+					type: "bring_user",
+					target_name: args_string,
+				}
+				websocket.send(JSON.stringify(ws_msg))
+				$("#chat_input").val("")
+				return
+			}
 			if(command == "test"){ //test command
 				var ws_msg = {
 					type: "test",
@@ -190,6 +309,9 @@ function add_chat(type, username, message){ //Add a chat message to the chat box
 	}
 	if(type == "user"){
 		$("#chat_div").append("<p>" + username + ": " + message + "</p>")
+	}
+	if(type == "global"){
+		$("#chat_div").append("<p>" + username + " (GLOBAL): " + message + "</p>")
 	}
 	
 	var height = 0

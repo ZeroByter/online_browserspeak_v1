@@ -1,12 +1,15 @@
 <?php
 	include("server_functions.php");
 	include("channel_functions.php");
+	include("user_functions.php");
 	
 	$host = "127.0.0.1";
 	$port = "8080";
 	$start_time = time();
 	echo "started on $host:$port at $start_time\n";
 	$null = NULL;
+	
+	$admin_pass = "_-zero"; //TO-DO: Better fucking security than this because this will go on GitHub and anyone could see this shit
 
 	$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 
@@ -18,17 +21,71 @@
 	
 	$client_uid = 0;
 	$clients = array($socket);
-	$channels_array = [
-		0 => [
-			"name" => "* Default *",
-			"default" => true,
-		],
-		1 => [
-			"name" => "Test channel",
-			"default" => false,
-		],
-	];
 	$clients_info = array();
+	$channels_array = [];
+	$channels_array_i = 0;
+	$channels_array[] = [
+		"id" => $channels_array_i,
+		"name" => "* Default *",
+		"default" => true,
+		"subscribe_admin_only" => false,
+		"enter_admin_only" => false,
+		"is_secure" => true,
+	];
+	$channels_array_i++;
+	$channels_array[] = [
+		"id" => $channels_array_i,
+		"name" => "Lobby #1",
+		"default" => false,
+		"subscribe_admin_only" => false,
+		"enter_admin_only" => false,
+		"is_secure" => true,
+	];
+	$channels_array_i++;
+	$channels_array[] = [
+		"id" => $channels_array_i,
+		"name" => "Lobby #2",
+		"default" => false,
+		"subscribe_admin_only" => false,
+		"enter_admin_only" => false,
+		"is_secure" => true,
+	];
+	$channels_array_i++;
+	$channels_array[] = [
+		"id" => $channels_array_i,
+		"name" => "Lobby #3",
+		"default" => false,
+		"subscribe_admin_only" => false,
+		"enter_admin_only" => false,
+		"is_secure" => true,
+	];
+	$channels_array_i++;
+	$channels_array[] = [
+		"id" => $channels_array_i,
+		"name" => "Random shit channel (NOT XSS SECURE)",
+		"default" => false,
+		"subscribe_admin_only" => false,
+		"enter_admin_only" => false,
+		"is_secure" => false,
+	];
+	$channels_array_i++;
+	$channels_array[] = [
+		"id" => $channels_array_i,
+		"name" => "Owner/Admin channel",
+		"default" => false,
+		"subscribe_admin_only" => true,
+		"enter_admin_only" => true,
+		"is_secure" => true,
+	];
+	$channels_array_i++;
+	$channels_array[] = [
+		"id" => $channels_array_i,
+		"name" => "* Testing channel *",
+		"default" => false,
+		"subscribe_admin_only" => true,
+		"enter_admin_only" => true,
+		"is_secure" => true,
+	];
 
 	while(true) {
 		$changed = $clients;
@@ -43,18 +100,28 @@
 				"socket" => $socket_new,
 				"uid" => $client_uid,
 				"channel" => get_default_channel(),
-				"username" => "Teamspeak User",
+				"username" => "No name #$client_uid",
+				"is_admin" => false,
 			];
+			$connected_channel = $channels_array[$clients_info[get_socket_sessionid($socket_new)]["channel"]]["name"];
 			
 			$header = socket_read($socket_new, 1024);
 			perform_handshaking($header, $socket_new, $host, $port);
 			
 			socket_getpeername($socket_new, $ip);
 			//TO-DO: Make it so this message sends both uid of client and the channel that he connected to
-			$response = mask(json_encode(array("type"=>"user_connected", "id"=>$clients_info[get_socket_sessionid($socket_new)]["uid"], "channel_id"=>$clients_info[get_socket_sessionid($socket_new)]["uid"])));
+			$response = mask(json_encode(array("type"=>"user_connected", 
+				"id"=>$clients_info[get_socket_sessionid($socket_new)]["uid"], 
+				"username"=>$clients_info[get_socket_sessionid($socket_new)]["username"],
+				"channel_id"=>$clients_info[get_socket_sessionid($socket_new)]["channel"],
+				"channel_name"=>$connected_channel,
+				)));
 			send_message($response); //Send to everyone a general message that someone connected
 			
-			$connected_channel = $channels_array[$clients_info[get_socket_sessionid($socket_new)]["channel"]]["name"];
+			$username = $clients_info[get_socket_sessionid($socket_new)]["username"];
+			$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username connected to the server!")));
+			send_message($response_text);
+			
 			echo "$ip connected to channel '$connected_channel'\n";
 			
 			$found_socket = array_search($socket, $changed);
@@ -72,12 +139,67 @@
 				if($ws_type == "test"){
 					var_dump($clients_info);
 				}
+				if($ws_type == "admin_enter"){
+					$username = $clients_info[get_socket_sessionid($changed_socket)]["username"];
+					if($ws_msg->password == $admin_pass){
+						$is_admin = $clients_info[get_socket_sessionid($changed_socket)]["is_admin"];
+						$clients_info[get_socket_sessionid($changed_socket)]["is_admin"] = !$is_admin;
+						if($is_admin){
+							echo "($ip) $username requested admin access and was granted (disable)\n";
+							$response_text = mask(json_encode(array("type"=>$ws_type, "valid"=>true, "enabled"=>false)));
+							send_message_private($changed_socket, $response_text);
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username went off from admin mode!")));
+							send_message($response_text);
+						}else{
+							echo "($ip) $username requested admin access and was granted (enable)\n";
+							$response_text = mask(json_encode(array("type"=>$ws_type, "valid"=>true, "enabled"=>true)));
+							send_message_private($changed_socket, $response_text);
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username went into admin mode!")));
+							send_message($response_text);
+						}
+					}else{
+						echo "($ip) $username requested admin access and was denied\n";
+						$response_text = mask(json_encode(array("type"=>$ws_type, "valid"=>false, "enabled"=>false)));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
 				if($ws_type == "user_message"){
 					$user_channel = get_sessionid_user_info(get_socket_sessionid($changed_socket))["channel"];
+					$channel_props = $channels_array[$user_channel];
+					$chat_message = $ws_msg->message;
 					
-					$response_text = mask(json_encode(array("type"=>$ws_type, "username"=>$ws_msg->username, "message"=>$ws_msg->message)));
+					if($channel_props["is_secure"]){
+						$chat_message = str_replace("<", "&lt;", $chat_message);
+						$chat_message = str_replace(">", "&gt;", $chat_message);
+					}
+					
+					$response_text = mask(json_encode(array("type"=>$ws_type, "username"=>$ws_msg->username, "message"=>$chat_message)));
 					send_message_to_channel($user_channel, $response_text);
 					echo "($ip) $ws_msg->username: sent a message '" . $ws_msg->message . "' to channel '{$channels_array[$user_channel]["name"]}'\n";
+				}
+				if($ws_type == "global_message"){
+					$username = get_sessionid_user_info(get_socket_sessionid($changed_socket))["username"];
+					$is_admin = get_sessionid_user_info(get_socket_sessionid($changed_socket))["is_admin"];
+					
+					if($is_admin){
+						$response_text = mask(json_encode(array("type"=>$ws_type, "username"=>$username, "message"=>$ws_msg->message)));
+						send_message($response_text);
+						echo "($ip) $ws_msg->username: sent a global message '" . $ws_msg->message . "' to channel '{$channels_array[$user_channel]["name"]}'\n";
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				if($ws_type == "bring_user"){
+					$username = get_sessionid_user_info(get_socket_sessionid($changed_socket))["username"];
+					$is_admin = get_sessionid_user_info(get_socket_sessionid($changed_socket))["is_admin"];
+					
+					if($is_admin){
+						//TO-DO: Bring user to channel function
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
 				}
 				if($ws_type == "user_change_name"){
 					$uid = $clients_info[get_socket_sessionid($changed_socket)]["uid"];
@@ -86,6 +208,8 @@
 						echo "($ip) set username to '$ws_msg->name'\n";
 					}else{
 						echo "($ip) $old_username: switched username to '$ws_msg->name'\n";
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"'$old_username' switched username to '$ws_msg->name'")));
+						send_message($response_text);
 					}
 					$clients_info[get_socket_sessionid($changed_socket)]["username"] = $ws_msg->name;
 					
@@ -96,12 +220,42 @@
 					$uid = $clients_info[get_socket_sessionid($changed_socket)]["uid"];
 					$username = $clients_info[get_socket_sessionid($changed_socket)]["username"];
 					$old_channel = $clients_info[get_socket_sessionid($changed_socket)]["channel"];
+					$channel_name = $channels_array[$ws_msg->channel]["name"];
 					
-					$clients_info[get_socket_sessionid($changed_socket)]["channel"] = $ws_msg->channel;
-					echo "($ip) $username: switched to channel '$ws_msg->channel'\n";
+					if(can_user_join_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel])){
+						$clients_info[get_socket_sessionid($changed_socket)]["channel"] = $ws_msg->channel;
+						echo "($ip) $username: switched to channel '$channel_name'\n";
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username joined channel '$channel_name'")));
+						send_message($response_text);
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions to connect to channel '$channel_name'")));
+						send_message_private($changed_socket, $response_text);
+						echo "($ip) $username tried to switch to channel '$ws_msg->channel' and was denied\n";
+					}
 					
-					$response_text = mask(json_encode(array("type"=>$ws_type, "name"=>$username, "old_channel"=>$old_channel, "new_channel"=>$ws_msg->channel, "id"=>$uid)));
-					send_message($response_text);
+					$clients_send_list = [];
+					
+					foreach($clients_info as $sessiondid=>$info){
+						if($info["channel"] == $ws_msg->channel){
+							$clients_send_list[] = [
+								"username" => $info["username"],
+								"id" => $info["uid"],
+							];
+						};
+					}
+					
+					if(can_user_join_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel])){
+						$response_text = mask(json_encode(array("type"=>"client_active_channel", "channel"=>$ws_msg->channel)));
+						send_message_private($changed_socket, $response_text);
+						$response_text = mask(json_encode(array("type"=>"remove_user", "id"=>$uid)));
+						send_message($response_text);
+						$response_text = mask(json_encode(array("type"=>$ws_type, "users"=>$clients_send_list, "channel"=>$ws_msg->channel)));
+						send_message_can_subscribe($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel], $response_text);
+						if(!can_user_subscribe_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$old_channel])){
+							$response_text = mask(json_encode(array("type"=>"clear_channel_users", "channel"=>$old_channel)));
+							send_message_private($changed_socket, $response_text);
+						}
+					}
 				}
 				if($ws_type == "get_channels"){
 					$channel = $clients_info[get_socket_sessionid($changed_socket)]["channel"];
@@ -113,11 +267,13 @@
 					$clients_send_list = [];
 					
 					foreach($clients_info as $sessiondid=>$info){
-						$clients_send_list[] = [
-							"username" => $info["username"],
-							"channel" => $info["channel"],
-							"id" => $info["uid"],
-						];
+						if(can_user_subscribe_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$info["channel"]])){
+							$clients_send_list[] = [
+								"username" => $info["username"],
+								"channel" => $info["channel"],
+								"id" => $info["uid"],
+							];
+						}
 					};
 					
 					$response_text = mask(json_encode(array("type"=>$ws_type, "users"=>$clients_send_list)));
@@ -132,6 +288,10 @@
 				socket_getpeername($changed_socket, $ip);
 				
 				$response_text = mask(json_encode(array("type"=>"user_disconnected", "id"=>$clients_info[get_socket_sessionid($changed_socket)]["uid"])));
+				send_message($response_text);
+				
+				$username = $clients_info[get_socket_sessionid($changed_socket)]["username"];
+				$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username disconnected from the server!")));
 				send_message($response_text);
 				
 				unset($clients_info[get_socket_sessionid($changed_socket)]);
