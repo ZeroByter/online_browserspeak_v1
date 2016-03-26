@@ -1,14 +1,22 @@
-<link rel="stylesheet" type="text/css" href="index.css">
-
+<script type="text/javascript" src="/jsscripts/cookie.js"></script>
 <script type="text/javascript" src="jquery-2.2.0.min.js"></script>
 
-<body>
-	<div id="channels_div">
-		
-	</div>
-	<div id="chat_div"></div>
-	<input id="chat_input" placeholder="Click on me, type your message, and press enter to send...">
-	</input>
-</body>
+<br><br><br>
+
+<center>
+	Identity: <input id="identity"></input><br>
+	Username: <input id="username" value="Teamspeak User"></input><br>
+	<br>
+	Server IP: <input id="server_ip"></input><br>
+	Server Port: <input id="server_port"></input><br>
+	<br>
+	<button id="connect_to_server">Connect to server</button>
+</center>
 
 <script type="text/javascript" src="index.js"></script>
+
+<style>
+	input{
+		margin-bottom: 3px;
+	}
+</style>

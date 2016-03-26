@@ -1,0 +1,101 @@
+body{
+	margin: 0px;
+	font-family: arial;
+}
+
+#title{
+	position: fixed;
+	top: 5px;
+	left: 5px;
+}
+
+#disconnect{
+	position: fixed;
+	top: 5px;
+	right: 305px;
+}
+
+#channels_div{
+	background: #F8F8F8;
+	width: calc(100% - 320px);
+	height: calc(70% - 20px);
+	padding: 10px;
+	text-align: -webkit-center;
+}
+
+#chat_div{
+	width: calc(100% - 300px);
+	height: calc(30% - 33px);
+	padding-top: 4px;
+	text-align: -webkit-center;
+	overflow: auto;
+}
+
+#information_div{
+	border-left-style: solid;
+	border-color: #E1E1E1;
+	border-width: 1px;
+	padding: 6px 8px;
+	height: calc(100% - 12px);
+	width: calc(300px - 16px);
+	position: absolute;
+	top: 0px;
+	right: 0px;
+}
+
+#chat_div p{
+	margin: 5px 0px;
+}
+
+#chat_input{
+	width: calc(100% - 300px);
+	padding: 5px 4px;
+}
+
+.channel{
+	text-decoration: underline;
+	display: table-row;
+}
+
+.channel:not(.active_channel){
+	color: blue;
+	cursor: pointer;
+}
+
+.user{
+	display: table;
+}
+
+#channel_context_menu, #user_context_menu{
+	display: none;
+	background: #E9E9E9;
+	position: absolute;
+	top: 200px;
+	left: 400px;
+	width: 200px;
+	padding: 4px;
+	box-shadow: 4px 4px 10px #888888;
+}
+
+.ctx_menu_btn button{
+	padding: 0px;
+	text-align: left;
+	background: none;
+	color: none;
+	border: none;
+	display: inherit;
+	font: inherit;
+	outline: none;
+	cursor: pointer;
+	width: 192px;
+}
+
+.ctx_menu_btn{
+	margin: 3px 0px;
+	padding: 0px 4px;
+}
+
+.ctx_menu_btn:hover{
+	background: #CFCFCF;
+	border-radius: 4px;
+}
