@@ -327,6 +327,29 @@
 					send_message_private($changed_socket, $response_text);
 				}
 				
+				if($ws_type == "channel_change_name"){
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$id = $ws_msg->id;
+					$new_name = $ws_msg->name;
+					$is_admin = $clients_info[get_socket_sessionid($changed_socket)]["is_admin"];
+					if($is_admin){
+						$target_channel = $channels_array[$id];
+						$old_name = $channels_array[$id]["name"];
+						$channels_array[$id]["name"] = $new_name;
+						store_channel_name($id, $new_name);
+						
+						$response_text = mask(json_encode(array("type"=>"channel_change_name", "id"=>$id, "name"=>$new_name)));
+						send_message($response_text);
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"User {$user_info["username"]} changed channel's '$old_name' name to '$new_name'")));
+						send_message_but_local($changed_socket, $response_text);
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"Channel '$old_name' changed to '$new_name'")));
+						send_message_private($changed_socket, $response_text);
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				
 				if($ws_type == "user_change_name"){
 					$identity = $clients_info[get_socket_sessionid($changed_socket)]["identity"];
 					$uid = $clients_info[get_socket_sessionid($changed_socket)]["uid"];
