@@ -54,13 +54,19 @@
 	}
 	//store_channel("Lobby #1", 1, true, false, false, true);
 	
-	/*
-	function store_identity_username($identity, $username){
+	function store_channel_name(id, $name){
 		$conn = sql_connect();
-		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET username='$username' WHERE identity='$identity'");
+		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET name='$name' WHERE id='$id'");
 		mysqli_stmt_execute($stmt1);
 		mysqli_stmt_close($stmt1);
 		sql_disconnect($conn);
 	}
-	*/
+	
+	function store_channel_order(id, $order){
+		$conn = sql_connect();
+		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET order='$order' WHERE id='$id'");
+		mysqli_stmt_execute($stmt1);
+		mysqli_stmt_close($stmt1);
+		sql_disconnect($conn);
+	}
 ?>
