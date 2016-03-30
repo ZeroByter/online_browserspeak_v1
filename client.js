@@ -127,6 +127,14 @@ websocket.onmessage = function(event){ //When a websocket message is received
 		add_chat("user", ws_msg.username, ws_msg.message)
 	}
 	
+	if(type == "channel_change_name"){
+		$(".channel").each(function(){
+			if($(this).data("id") == ws_msg.id){
+				$(this).html(ws_msg.name)
+			}
+		})
+	}
+	
 	if(type == "get_channels"){
 		$.each(ws_msg.channels, function(i, v){
 			add_channel(v["name"], i, i == ws_msg.active_channel, v["is_secure"])
