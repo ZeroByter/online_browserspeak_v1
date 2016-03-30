@@ -20,6 +20,9 @@
 			<button id="cntx_switch_channel">Switch channel</button>
 		</div>
 		<div class="ctx_menu_btn">
+			<button>Change channel name</button>
+		</div>
+		<div class="ctx_menu_btn">
 			<button>Add channel after</button>
 		</div>
 		<div class="ctx_menu_btn">
