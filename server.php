@@ -28,12 +28,13 @@
 	$channels_array_i = -1;
 	$channels_array = [];
 	
-	foreach(get_all_channels() as $key=>$value){
+	foreach(get_all_channels_by_order() as $key=>$value){
 		if(isset($value->id)){
 			$channels_array_i++;
 			$channels_array[] = [
 				"id" => $channels_array_i,
 				"name" => $value->name,
+				"order" => $value->order,
 				"default" => $value->is_default,
 				"subscribe_admin_only" => $value->subscribe_admin_only,
 				"enter_admin_only" => $value->enter_admin_only,
