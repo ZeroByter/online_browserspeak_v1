@@ -26,6 +26,17 @@
 	}
 	*/
 	
+	function get_all_channels_by_order(){
+		$conn = sql_connect();
+		$result = mysqli_query($conn, "SELECT * FROM channels SORT BY order ASC");
+		sql_disconnect($conn);
+		
+		$array = array();
+		while($array[] = mysqli_fetch_object($result));
+		
+		return $array;
+	}
+	
 	function get_all_channels(){
 		$conn = sql_connect();
 		$result = mysqli_query($conn, "SELECT * FROM channels");
