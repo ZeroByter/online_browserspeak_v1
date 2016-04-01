@@ -12,20 +12,6 @@
 		sql_disconnect($conn);
 	}
 	
-	/*
-	function does_identity_exist($identity){		
-		$conn = sql_connect();
-		$stmt = mysqli_prepare($conn, "SELECT id FROM channels WHERE identity='$identity'");
-		mysqli_stmt_execute($stmt);
-		mysqli_stmt_bind_result($stmt, $result);
-		mysqli_stmt_fetch($stmt);
-		mysqli_stmt_close($stmt);
-		sql_disconnect($conn);
-		
-		return($result != null);
-	}
-	*/
-	
 	function get_all_channels_by_order(){
 		$conn = sql_connect();
 		$result = mysqli_query($conn, "SELECT * FROM channels ORDER BY listorder ASC");
@@ -48,6 +34,18 @@
 		return $array;
 	}
 	
+	function get_channel_by_id($id){
+		$conn = sql_connect();
+		$stmt = mysqli_prepare($conn, "SELECT * FROM channels WHERE id='$id'");
+		mysqli_stmt_execute($stmt);
+		mysqli_stmt_bind_result($stmt, $result["id"], $result["listorder"], $result["name"], $result["subscribe_admin_only"], $result["enter_admin_only"], $result["is_secure"], $result["is_default"]);
+		mysqli_stmt_fetch($stmt);
+		mysqli_stmt_close($stmt);
+		sql_disconnect($conn);
+		
+		return (object) $result;
+	}
+	
 	function store_channel($name, $order, $default, $subscribe_admin_only, $enter_admin_only, $is_secure){
 		if($order == null || gettype($order) == "boolean"){
 			$order = 0;
@@ -58,34 +56,52 @@
 		$rows_result = mysqli_query($conn, "SELECT id FROM channels");
 		$rows_cnt = mysqli_num_rows($rows_result);
 		
-		$stmt = mysqli_prepare($conn, "INSERT INTO channels(name, is_default, subscribe_admin_only, enter_admin_only, is_secure) VALUES ('$name', '$default', '$subscribe_admin_only', '$enter_admin_only', '$is_secure')");
+		$name = str_replace("'", "\'", $name);
+		$name = str_replace('"', '\"', $name);
+		
+		$stmt = mysqli_prepare($conn, "INSERT INTO channels(name, listorder, is_default, subscribe_admin_only, enter_admin_only, is_secure) VALUES ('$name', '$order', '$default', '$subscribe_admin_only', '$enter_admin_only', '$is_secure')");
+		mysqli_stmt_execute($stmt);
+		mysqli_stmt_close($stmt);
+		$last_id = mysqli_insert_id($conn);
+		sql_disconnect($conn);
+		
+		return $last_id;
+	}
+	
+	function store_delete_channel($id){
+		$listorder = get_channel_by_id($id)->listorder;
+		
+		$conn = sql_connect();
+		$stmt = mysqli_prepare($conn, "UPDATE channels SET listorder=listorder-1 WHERE listorder>$listorder");
+		mysqli_stmt_execute($stmt);
+		mysqli_stmt_close($stmt);
+		$stmt = mysqli_prepare($conn, "DELETE FROM channels WHERE id=$id");
 		mysqli_stmt_execute($stmt);
 		mysqli_stmt_close($stmt);
 		sql_disconnect($conn);
 	}
-	//store_channel("Lobby #1", 1, true, false, false, true);
 	
 	function store_push_channels_down($listorder_to_push){
 		$conn = sql_connect();
-		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET listorder=listorder+1 WHERE listorder>=$listorder_to_push");
-		mysqli_stmt_execute($stmt1);
-		mysqli_stmt_close($stmt1);
+		$stmt = mysqli_prepare($conn, "UPDATE channels SET listorder=listorder+1 WHERE listorder>$listorder_to_push");
+		mysqli_stmt_execute($stmt);
+		mysqli_stmt_close($stmt);
 		sql_disconnect($conn);
 	}
 	
 	function store_channel_name($id, $name){
 		$conn = sql_connect();
-		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET name='$name' WHERE id>'$id'");
-		mysqli_stmt_execute($stmt1);
-		mysqli_stmt_close($stmt1);
+		$stmt = mysqli_prepare($conn, "UPDATE channels SET name='$name' WHERE id>'$id'");
+		mysqli_stmt_execute($stmt);
+		mysqli_stmt_close($stmt);
 		sql_disconnect($conn);
 	}
 	
 	function store_channel_order($id, $order){
 		$conn = sql_connect();
-		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET listorder='$order' WHERE id='$id'");
-		mysqli_stmt_execute($stmt1);
-		mysqli_stmt_close($stmt1);
+		$stmt = mysqli_prepare($conn, "UPDATE channels SET listorder='$order' WHERE id='$id'");
+		mysqli_stmt_execute($stmt);
+		mysqli_stmt_close($stmt);
 		sql_disconnect($conn);
 	}
 ?>

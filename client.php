@@ -1,7 +1,7 @@
 <link rel="stylesheet" type="text/css" href="client.css">
 
 <script type="text/javascript" src="/jsscripts/cookie.js"></script>
-<script type="text/javascript" src="jquery-2.2.0.min.js"></script>
+<script type="text/javascript" src="/jsscripts/jquery-2.2.0.min.js"></script>
 
 <body>
 	<text id="title">Browser Teamspeak version 1.0</text>
@@ -26,7 +26,7 @@
 			<button id="cntx_add_channel_after">Add channel after</button>
 		</div>
 		<div class="ctx_menu_btn">
-			<button>Delete channel</button>
+			<button id="cntx_delete_channel">Delete channel</button>
 		</div>
 		<div class="ctx_menu_btn">
 			<button>Make channel default</button>
@@ -49,5 +49,6 @@
 	</div>
 </body>
 
-<script type="text/javascript" src="/client.js"></script>
-<script type="text/javascript" src="/client_context_functions.js"></script>
+<script type="text/javascript" src="/jsscripts/client_ws_messages.js"></script>
+<script type="text/javascript" src="/jsscripts/client.js"></script>
+<script type="text/javascript" src="/jsscripts/client_context_functions.js"></script>

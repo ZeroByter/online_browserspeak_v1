@@ -13,8 +13,26 @@ $("#cntx_switch_channel").click(function(){
 })
 
 $("#cntx_add_channel_after").click(function(){
-	$("#chat_input").val("/add_channel_after " + $(context_menu_target).data("id") + " {insert channel name here}")
-	$("#chat_input").focus()
+	//$("#chat_input").val("/add_channel_after " + $(context_menu_target).data("id") + " ")
+	//$("#chat_input").focus()
+	
+	var name = prompt("Please enter name for new channel")
+	if(name){
+		var ws_msg = {
+			type: "add_channel_after",
+			id: $(context_menu_target).data("id"),
+			name: name,
+		}
+		websocket.send(JSON.stringify(ws_msg))
+	}
+})
+
+$("#cntx_delete_channel").click(function(){
+	var ws_msg = {
+		type: "delete_channel",
+		id: $(context_menu_target).data("id"),
+	}
+	websocket.send(JSON.stringify(ws_msg))
 })
 
 $("#cntx_change_channel_name").click(function(){

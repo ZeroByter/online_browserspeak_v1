@@ -68,122 +68,7 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	
 	console.log("message received -- type: " + type)
 	
-	if(type == "get_own_info"){
-		username = ws_msg.client_info.username
-		own_id = ws_msg.client_info.uid
-	}
-	
-	if(type == "admin_name_change"){
-		var uid = ws_msg.uid
-		var enabled = ws_msg.enabled
-		var name = ws_msg.name
-		if(enabled){
-			user_change_name(ws_msg.uid, "<b>" + ws_msg.name + " [Admin]</b>")
-			user_change_is_admin(ws_msg.uid, 1)
-		}else{
-			user_change_name(ws_msg.uid, ws_msg.name)
-			user_change_is_admin(ws_msg.uid, 0)
-		}
-	}
-	
-	if(type == "kick_message"){
-		alert(ws_msg.message)
-	}
-	
-	if(type == "system_message"){
-		add_chat("system", "", ws_msg.message)
-	}
-	
-	if(type == "private_message"){
-		add_chat("private", ws_msg.username, ws_msg.message)
-	}
-	
-	if(type == "global_message"){
-		add_chat("global", ws_msg.username, ws_msg.message)
-	}
-	
-	if(type == "error_message"){
-		add_chat("error", "", ws_msg.message)
-	}
-	
-	if(type == "user_message"){
-		add_chat("user", ws_msg.username, ws_msg.message)
-	}
-	
-	if(type == "channel_change_name"){
-		$(".channel").each(function(){
-			if($(this).data("id") == ws_msg.id){
-				$(this).html(ws_msg.name)
-			}
-		})
-	}
-	
-	if(type == "get_channels"){
-		$.each(ws_msg.channels, function(i, v){
-			add_channel(v["name"], v["order"], i, i == ws_msg.active_channel, v["is_secure"])
-		})
-	}
-	
-	if(type == "get_users_in_channel"){
-		clear_channel_users(ws_msg.channel)
-		$.each(ws_msg.users, function(i, v){
-			add_user_to_channel(ws_msg.channel, {
-				"id": v["id"],
-				"name": v["username"],
-				"is_admin": v["is_admin"],
-			})
-		})
-	}
-	
-	if(type == "get_users_in_channels"){
-		$.each(ws_msg.users, function(i, v){
-			add_user_to_channel(v["channel"], {
-				"id": v["id"],
-				"name": v["username"],
-				"is_admin": v["is_admin"],
-			})
-		})
-	}
-	
-	if(type == "user_change_channel"){
-		clear_channel_users(ws_msg.channel)
-		$.each(ws_msg.users, function(i, v){
-			add_user_to_channel(ws_msg.channel, {
-				"id": v["id"],
-				"name": v["username"],
-				"is_admin": v["is_admin"],
-			})
-		})
-	}
-	
-	if(type == "client_active_channel"){
-		$(".active_channel").removeClass("active_channel")
-		$(".channel").each(function(i, v){
-			if($(this).data("id") == ws_msg.channel){
-				$(this).addClass("active_channel")
-			}
-		})
-	}
-	
-	if(type == "user_change_name"){
-		user_change_name(ws_msg.id, ws_msg.new_name)
-	}
-	
-	if(type == "user_connected"){
-		add_user_to_channel(ws_msg.channel_id, {
-			"id": ws_msg.id,
-			"name": ws_msg.username,
-			"is_admin": ws_msg.is_admin,
-		})
-	}
-	
-	if(type == "remove_user"){
-		remove_user(ws_msg.id)
-	}
-	
-	if(type == "clear_channel_users"){
-		clear_channel_users(ws_msg.channel)
-	}
+	ws_messages[type](ws_msg)
 }
 
 function add_channel(name, listorder, id, active_channel, xss_protected){ //Add a channel to the channels div
@@ -191,10 +76,22 @@ function add_channel(name, listorder, id, active_channel, xss_protected){ //Add 
 	if(active_channel){
 		active_channel_str = "active_channel"
 	}
-	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" listorder=\"" + listorder + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-xss-secure=\"" + xss_protected + "\">" + name + "</span>")
-	$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\"></span>")
-	return true
+	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"  data-xss-secure=\"" + xss_protected + "\">" + name + "</span>")
+	$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"></span>")
 }
+
+function insert_channel_after(after_order, name, channel_listorder, id, is_secure){ //Add a channel to the channels div after a specific channel
+	$(".channel_users").each(function(){
+		if(after_order <= $(this).data("listorder")){
+			//$("#channels_div").append("<span class=\"channel\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"  data-xss-secure=\"" + is_secure + "\">" + name + "</span>")
+			//$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"></span>")
+			$("<span class=\"channel\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"  data-xss-secure=\"" + is_secure + "\">" + name + "</span>").insertAfter(this)
+			$("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"></span>").insertAfter(this)
+			return false
+		}
+	})
+}
+insert_channel_after(5, "Test", 6, 20, 1)
 
 function clear_channel_users(channel_id){
 	$(".channel_users").each(function(){
@@ -209,7 +106,6 @@ function add_user_to_channel(channel_id, user_properties){
 		if($(this).data("id") == channel_id){
 			var real_name = user_properties["name"]
 			real_name = real_name.replace("<b>", "").replace(" [Admin]</b>", "")
-			//real_name = real_name.replace(" [Admin]</b>", "")
 			$(this).append("<span class=\"user\" data-id=\"" + user_properties["id"] + "\" data-name=\"" + real_name + "\" data-is-admin=\"" + user_properties["is_admin"] + "\">" + user_properties["name"] + "</span>")
 		}
 	})
@@ -228,6 +124,14 @@ function user_change_name(id, new_name){
 	$(".user").each(function(){
 		if($(this).data("id") == id){
 			$(this).html(new_name)
+		}
+	})
+}
+
+function remove_channel(id){
+	$(".channel, .channel_users").each(function(){
+		if($(this).data("id") == id){
+			$(this).remove()
 		}
 	})
 }
@@ -322,20 +226,26 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 			args_string = args_string.join(" ").replace(" ", "")
 			
 			if(command == "username"){ //Set username command
-				if(args_string.length >= username_min_length){
-					var ws_msg = {
-						type: "user_change_name",
-						name: args_string,
+				if(args_string.length < 48){
+					if(args_string.length >= username_min_length){
+						var ws_msg = {
+							type: "user_change_name",
+							name: args_string,
+						}
+						websocket.send(JSON.stringify(ws_msg))
+						
+						add_chat("system", "", "Username set to '" + args_string + "' (" + args_string.length + ")")
+						username = args_string
+						$("#chat_input").val("")
+						setCookie("username", args_string, "365")
+						return false
+					}else{
+						add_chat("error", "", "Username must be longer than " + username_min_length + " charachers! The username you entered (" + args_string + ") was " + args_string.length + " long!")
+						$("#chat_input").val("/username ")
+						return false
 					}
-					websocket.send(JSON.stringify(ws_msg))
-					
-					add_chat("system", "", "Username set to '" + args_string + "' (" + args_string.length + ")")
-					username = args_string
-					$("#chat_input").val("")
-					setCookie("username", args_string, "365")
-					return false
 				}else{
-					add_chat("error", "", "Username must be longer than " + username_min_length + " charachers! The username you entered (" + args_string + ") was " + args_string.length + " long!")
+					add_chat("error", "", "Username must be shorter than 48 charachers! The username you entered was " + args_string.length + " long!")
 					$("#chat_input").val("/username ")
 					return false
 				}
@@ -384,7 +294,7 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 				$("#chat_input").val("")
 				return
 			}
-			if(command == "add_channel_after"){ //Change channel name chat command
+			/*if(command == "add_channel_after"){ //Change channel name chat command
 				var name = args_string.split(" ")
 				delete name[0]
 				$.each(name, function(i, v){
@@ -400,7 +310,7 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 				websocket.send(JSON.stringify(ws_msg))
 				$("#chat_input").val("")
 				return
-			}
+			}*/
 			if(command == "pmsg"){ //Private message command
 				var message = args_string.split(" ")
 				delete message[0]
