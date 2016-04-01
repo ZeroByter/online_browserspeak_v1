@@ -68,23 +68,6 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	
 	console.log("message received -- type: " + type)
 	
-	if(type == "admin_enter"){
-		var valid = ws_msg.valid
-		var enabled = ws_msg.enabled
-		if(valid){
-			if(enabled){
-				add_chat("system", "", "Admin access granted and enabled!")
-				is_admin = true
-			}else{
-				add_chat("system", "", "Admin access granted and disabled!")
-				is_admin = false
-			}
-		}else{
-			add_chat("error", "", "Admin access denied!")
-			is_admin = false
-		}
-	}
-	
 	if(type == "get_own_info"){
 		username = ws_msg.client_info.username
 		own_id = ws_msg.client_info.uid
@@ -137,7 +120,7 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	
 	if(type == "get_channels"){
 		$.each(ws_msg.channels, function(i, v){
-			add_channel(v["name"], i, i == ws_msg.active_channel, v["is_secure"])
+			add_channel(v["name"], v["order"], i, i == ws_msg.active_channel, v["is_secure"])
 		})
 	}
 	
@@ -203,12 +186,12 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	}
 }
 
-function add_channel(name, id, active_channel, xss_protected){ //Add a channel to the channels div
+function add_channel(name, listorder, id, active_channel, xss_protected){ //Add a channel to the channels div
 	var active_channel_str = ""
 	if(active_channel){
 		active_channel_str = "active_channel"
 	}
-	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-xss-secure=\"" + xss_protected + "\">Channel: " + name + "</span>")
+	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" listorder=\"" + listorder + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-xss-secure=\"" + xss_protected + "\">" + name + "</span>")
 	$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\"></span>")
 	return true
 }
@@ -357,15 +340,6 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 					return false
 				}
 			}
-			/*if(command == "admin"){ //Admin login command
-				var ws_msg = {
-					type: "admin_enter",
-					password: args_string,
-				}
-				websocket.send(JSON.stringify(ws_msg))
-				$("#chat_input").val("")
-				return
-			}*/
 			if(command == "global"){ //Global chat command
 				var ws_msg = {
 					type: "global_message",
@@ -388,6 +362,40 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 				var ws_msg = {
 					type: "bring_user",
 					target_name: args_string,
+				}
+				websocket.send(JSON.stringify(ws_msg))
+				$("#chat_input").val("")
+				return
+			}
+			if(command == "change_channel_name"){ //Change channel name chat command
+				var name = args_string.split(" ")
+				delete name[0]
+				$.each(name, function(i, v){
+					name[i-1] = v
+					delete name[i]
+				})
+				name = name.join(" ")
+				var ws_msg = {
+					type: "change_channel_name",
+					id: args[0],
+					name: name,
+				}
+				websocket.send(JSON.stringify(ws_msg))
+				$("#chat_input").val("")
+				return
+			}
+			if(command == "add_channel_after"){ //Change channel name chat command
+				var name = args_string.split(" ")
+				delete name[0]
+				$.each(name, function(i, v){
+					name[i-1] = v
+					delete name[i]
+				})
+				name = name.join(" ")
+				var ws_msg = {
+					type: "add_channel_after",
+					id: args[0],
+					name: name,
 				}
 				websocket.send(JSON.stringify(ws_msg))
 				$("#chat_input").val("")

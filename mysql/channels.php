@@ -3,7 +3,7 @@
 		$conn = sql_connect();
 		mysqli_query($conn, "CREATE TABLE IF NOT EXISTS channels(id int(6) NOT NULL auto_increment, 
 			name varchar(48) NOT NULL, 
-			order varchar(6) NOT NULL, 
+			listorder int(6) NOT NULL, 
 			is_default boolean NOT NULL, 
 			subscribe_admin_only boolean NOT NULL, 
 			enter_admin_only boolean NOT NULL, 
@@ -28,7 +28,7 @@
 	
 	function get_all_channels_by_order(){
 		$conn = sql_connect();
-		$result = mysqli_query($conn, "SELECT * FROM channels SORT BY order ASC");
+		$result = mysqli_query($conn, "SELECT * FROM channels ORDER BY listorder ASC");
 		sql_disconnect($conn);
 		
 		$array = array();
@@ -65,17 +65,25 @@
 	}
 	//store_channel("Lobby #1", 1, true, false, false, true);
 	
-	function store_channel_name(id, $name){
+	function store_push_channels_down($listorder_to_push){
 		$conn = sql_connect();
-		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET name='$name' WHERE id='$id'");
+		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET listorder=listorder+1 WHERE listorder>=$listorder_to_push");
 		mysqli_stmt_execute($stmt1);
 		mysqli_stmt_close($stmt1);
 		sql_disconnect($conn);
 	}
 	
-	function store_channel_order(id, $order){
+	function store_channel_name($id, $name){
 		$conn = sql_connect();
-		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET order='$order' WHERE id='$id'");
+		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET name='$name' WHERE id>'$id'");
+		mysqli_stmt_execute($stmt1);
+		mysqli_stmt_close($stmt1);
+		sql_disconnect($conn);
+	}
+	
+	function store_channel_order($id, $order){
+		$conn = sql_connect();
+		$stmt1 = mysqli_prepare($conn, "UPDATE channels SET listorder='$order' WHERE id='$id'");
 		mysqli_stmt_execute($stmt1);
 		mysqli_stmt_close($stmt1);
 		sql_disconnect($conn);

@@ -31,4 +31,13 @@
 			return true;
 		}
 	}
+	
+	function get_channels_by_order(){
+		global $channels_array;
+		
+		foreach($channels_array as $key => $row){
+		    $listorder[$key] = $row['listorder'];
+		}
+		array_multisort($listorder, SORT_DESC, $channels_array);
+	}
 ?>

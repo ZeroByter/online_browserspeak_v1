@@ -12,6 +12,16 @@ $("#cntx_switch_channel").click(function(){
 	}
 })
 
+$("#cntx_add_channel_after").click(function(){
+	$("#chat_input").val("/add_channel_after " + $(context_menu_target).data("id") + " {insert channel name here}")
+	$("#chat_input").focus()
+})
+
+$("#cntx_change_channel_name").click(function(){
+	$("#chat_input").val("/change_channel_name " + $(context_menu_target).data("id") + " ")
+	$("#chat_input").focus()
+})
+
 //User context menu functions
 $("#ctx_kick_user").click(function(){
 	var ws_msg = {

@@ -11,8 +11,6 @@
 	$start_time = time();
 	echo "started on $host:$port at $start_time\n";
 	$null = NULL;
-	
-	$admin_pass = "_-zero"; //TO-DO: Better fucking security than this because this will go on GitHub and anyone could see this shit
 
 	$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 
@@ -25,16 +23,14 @@
 	$client_uid = 0;
 	$clients = array($socket);
 	$clients_info = array();
-	$channels_array_i = -1;
 	$channels_array = [];
 	
 	foreach(get_all_channels_by_order() as $key=>$value){
 		if(isset($value->id)){
-			$channels_array_i++;
-			$channels_array[] = [
-				"id" => $channels_array_i,
+			$channels_array[$value->id] = [
+				"id" => $value->id,
 				"name" => $value->name,
-				"order" => $value->order,
+				"listorder" => $value->listorder,
 				"default" => $value->is_default,
 				"subscribe_admin_only" => $value->subscribe_admin_only,
 				"enter_admin_only" => $value->enter_admin_only,
@@ -42,7 +38,7 @@
 			];
 		}
 	}
-
+	
 	while(true) {
 		$changed = $clients;
 		socket_select($changed, $null, $null, 0, 1);
@@ -128,7 +124,7 @@
 				@$ws_type = $ws_msg->type;
 				
 				if($ws_type == "test"){
-					var_dump($clients_info);
+					var_dump($channels_array);
 				}
 				
 				if($ws_type == "user_disconnect"){
@@ -152,41 +148,6 @@
 					unset($clients[$found_socket]);
 					
 				}
-				
-				/*if($ws_type == "admin_enter"){
-					$username_fltr = decode_string($clients_info[get_socket_sessionid($changed_socket)]["username"]);
-					$username = $clients_info[get_socket_sessionid($changed_socket)]["username"];
-					$uid = $clients_info[get_socket_sessionid($changed_socket)]["uid"];
-					$identity = $clients_info[get_socket_sessionid($changed_socket)]["identity"];
-					if($ws_msg->password == $admin_pass){
-						$is_admin = $clients_info[get_socket_sessionid($changed_socket)]["is_admin"];
-						$clients_info[get_socket_sessionid($changed_socket)]["is_admin"] = !$is_admin;
-						if($is_admin){
-							echo "($ip) $username_fltr requested admin access and was granted (disable)\n";
-							$response_text = mask(json_encode(array("type"=>$ws_type, "valid"=>true, "enabled"=>false)));
-							send_message_private($changed_socket, $response_text);
-							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username went off from admin mode!")));
-							send_message($response_text);
-							$response_text = mask(json_encode(array("type"=>"admin_name_change", "uid"=>$uid, "enabled"=>false, "name"=>$username)));
-							send_message($response_text);
-							store_identity_is_admin($identity, false);
-						}else{
-							echo "($ip) $username_fltr requested admin access and was granted (enable)\n";
-							$response_text = mask(json_encode(array("type"=>$ws_type, "valid"=>true, "enabled"=>true)));
-							send_message_private($changed_socket, $response_text);
-							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username went into admin mode!")));
-							send_message($response_text);
-							$response_text = mask(json_encode(array("type"=>"admin_name_change", "uid"=>$uid, "enabled"=>true, "name"=>$username)));
-							send_message($response_text);
-							store_identity_is_admin($identity, true);
-						}
-					}else{
-						echo "($ip) $username requested admin access and was denied (failed password was '$ws_msg->password')\n";
-						$response_text = mask(json_encode(array("type"=>$ws_type, "valid"=>false, "enabled"=>false)));
-						send_message_private($changed_socket, $response_text);
-						store_identity_is_admin($identity, false);
-					}
-				}*/ //Disabled because why use passwords??
 				
 				if($ws_type == "user_message"){
 					$user_channel = get_sessionid_user_info(get_socket_sessionid($changed_socket))["channel"];
@@ -327,7 +288,7 @@
 					send_message_private($changed_socket, $response_text);
 				}
 				
-				if($ws_type == "channel_change_name"){
+				if($ws_type == "change_channel_name"){
 					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
 					$id = $ws_msg->id;
 					$new_name = $ws_msg->name;
@@ -338,12 +299,26 @@
 						$channels_array[$id]["name"] = $new_name;
 						store_channel_name($id, $new_name);
 						
-						$response_text = mask(json_encode(array("type"=>"channel_change_name", "id"=>$id, "name"=>$new_name)));
+						$response_text = mask(json_encode(array("type"=>$ws_type, "id"=>$id, "name"=>$new_name)));
 						send_message($response_text);
 						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"User {$user_info["username"]} changed channel's '$old_name' name to '$new_name'")));
 						send_message_but_local($changed_socket, $response_text);
 						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"Channel '$old_name' changed to '$new_name'")));
 						send_message_private($changed_socket, $response_text);
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				
+				if($ws_type == "add_channel_after"){
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$is_admin = $user_info["is_admin"];
+					$id = $ws_msg->id;
+					$name = $ws_msg->name;
+					if($is_admin){
+						store_push_channels_down($id);
+						//store_add_channel($id, );
 					}else{
 						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
 						send_message_private($changed_socket, $response_text);
@@ -424,7 +399,6 @@
 				
 				if($ws_type == "get_channels"){
 					$channel = $clients_info[get_socket_sessionid($changed_socket)]["channel"];
-					$xss_protected = $channels_array[$channel]["is_secure"];
 					$response_text = mask(json_encode(array("type"=>$ws_type, "channels"=>$channels_array, "active_channel"=>$channel)));
 					send_message_private($changed_socket, $response_text);
 					echo "($ip) requested to get a list of channels\n";
