@@ -76,22 +76,18 @@ function add_channel(name, listorder, id, active_channel, xss_protected){ //Add 
 	if(active_channel){
 		active_channel_str = "active_channel"
 	}
-	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"  data-xss-secure=\"" + xss_protected + "\">" + name + "</span>")
-	$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"></span>")
+	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"  data-xss-secure=\"" + xss_protected + "\">" + name + "</span><span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"></span>")
+	//$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"></span>")
 }
 
 function insert_channel_after(after_order, name, channel_listorder, id, is_secure){ //Add a channel to the channels div after a specific channel
 	$(".channel_users").each(function(){
 		if(after_order <= $(this).data("listorder")){
-			//$("#channels_div").append("<span class=\"channel\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"  data-xss-secure=\"" + is_secure + "\">" + name + "</span>")
-			//$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"></span>")
-			$("<span class=\"channel\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"  data-xss-secure=\"" + is_secure + "\">" + name + "</span>").insertAfter(this)
-			$("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"></span>").insertAfter(this)
+			$("<span class=\"channel\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"  data-xss-secure=\"" + is_secure + "\">" + name + "</span><span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + channel_listorder + "\"></span>").insertAfter(this)
 			return false
 		}
 	})
 }
-insert_channel_after(5, "Test", 6, 20, 1)
 
 function clear_channel_users(channel_id){
 	$(".channel_users").each(function(){

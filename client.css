@@ -54,16 +54,43 @@ body{
 
 .channel{
 	text-decoration: underline;
-	display: table-row;
+	display: block;
+	padding-top: 4px;
+	height: 20px;
+	cursor: pointer;
 }
 
 .channel:not(.active_channel){
 	color: blue;
-	cursor: pointer;
+}
+
+.channel:hover{
+	background: linear-gradient(to bottom, rgba(46,61,232,0) 0%,rgba(125,185,232,0.72) 60%,rgba(125,185,232,1) 79%);
+	border-radius: 4px;
+	border-style: solid;
+	border-color: #BABAFF;
+	border-width: 1px;
+	padding-top: 3px;
+	margin-bottom: -1px;
 }
 
 .user{
-	display: table;
+	cursor: pointer;
+	display: block;
+	width: 100%;
+	padding-top: 4px;
+	height: 20px;
+}
+
+.user:hover{
+	background: linear-gradient(to bottom, rgba(46,61,232,0) 0%,rgba(125,185,232,0.72) 60%,rgba(125,185,232,1) 79%);
+	border-radius: 4px;
+	border-style: solid;
+	border-color: #BABAFF;
+	border-width: 1px;
+	padding-top: 3px;
+	margin-bottom: -1px;
+	margin-left: -1px;
 }
 
 #channel_context_menu, #user_context_menu{

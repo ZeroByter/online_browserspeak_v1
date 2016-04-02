@@ -179,19 +179,19 @@
 					}
 				}
 				
-				if($ws_type == "kick_user"){
+				if($ws_type == "kick_user_server"){
 					$username = get_sessionid_user_info(get_socket_sessionid($changed_socket))["username"];
 					$is_admin = get_sessionid_user_info(get_socket_sessionid($changed_socket))["is_admin"];
 					
 					if($is_admin){
 						$target_info = get_user_by_name($ws_msg->target_name);
-						$response_text = mask(json_encode(array("type"=>"kick_message", "message"=>"Kicked from the server.")));
+						$response_text = mask(json_encode(array("type"=>"kick_message", "message"=>"Kicked from the server by $username.")));
 						send_message_private($target_info["socket"], $response_text);
 						
 						$response_text = mask(json_encode(array("type"=>"remove_user", "id"=>$target_info["uid"])));
 						send_message($response_text);
 						
-						echo "($ip) '{$target_info["username"]}' was kicked from the server by $username!\n";
+						echo "{$target_info["username"]} was kicked from the server by $username!\n";
 						
 						if(isset($target_info["socket"])){
 							socket_shutdown($target_info["socket"], 2);
@@ -202,6 +202,73 @@
 						
 						$found_socket = array_search($target_info["socket"], $clients);
 						unset($clients[$found_socket]);
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($target_info["socket"], $response_text);
+					}
+				}
+				
+				if($ws_type == "kick_user_channel"){
+					$username = get_sessionid_user_info(get_socket_sessionid($changed_socket))["username"];
+					$is_admin = get_sessionid_user_info(get_socket_sessionid($changed_socket))["is_admin"];
+					
+					if($is_admin){
+						$target_info = get_user_by_name($ws_msg->target_name);
+						$response_text = mask(json_encode(array("type"=>"kick_message", "message"=>"Kicked from the channel by $username.")));
+						send_message_private($target_info["socket"], $response_text);
+						
+						echo "{$target_info["username"]} was kicked from the channel '" . get_channel_name($target_info["channel"]) . "' by $username!\n";
+						
+						$clients_info[get_socket_sessionid($target_info["socket"])]["channel"] = get_default_channel();
+						
+						$clients_send_list = [];
+						foreach($clients_info as $sessiondid=>$info){
+							if($info["channel"] == get_default_channel()){
+								$username = $info["username"];
+								if($info["is_admin"]){
+									$username = "<b>" . $info["username"] . " [Admin]</b>";
+								}
+								$clients_send_list[] = [
+									"username" => $username,
+									"id" => $info["uid"],
+								];
+							};
+						}
+						
+						$response_text = mask(json_encode(array("type"=>"remove_user", "id"=>$target_info["uid"])));
+						send_message($response_text);
+						$response_text = mask(json_encode(array("type"=>"client_active_channel", "channel"=>get_default_channel())));
+						send_message_private($target_info["socket"], $response_text);
+						$response_text = mask(json_encode(array("type"=>"user_change_channel", "users"=>$clients_send_list, "channel"=>get_default_channel())));
+						send_message_can_subscribe($target_info["socket"], $channels_array[get_default_channel()], $response_text);
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($target_info["socket"], $response_text);
+					}
+				}
+				
+				if($ws_type == "kick_all_from_channel"){
+					$username = get_sessionid_user_info(get_socket_sessionid($changed_socket))["username"];
+					$is_admin = get_sessionid_user_info(get_socket_sessionid($changed_socket))["is_admin"];
+					
+					if($is_admin){
+						$target_channel = $ws_msg->channel;
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username kicked everyone from the channel '" . get_channel_name($target_channel) . "'")));
+						send_message($response_text);
+						
+						echo "$username kicked everyone out of channel '" . get_channel_name($target_channel) . "'\n";
+						
+						foreach($clients_info as $sessiondid=>$info){
+							if($info["channel"] == $target_channel){
+								$clients_info[get_socket_sessionid($info["socket"])]["channel"] = get_default_channel();
+								$response_text = mask(json_encode(array("type"=>"remove_user", "id"=>$info["uid"])));
+								send_message($response_text);
+								$response_text = mask(json_encode(array("type"=>"client_active_channel", "channel"=>get_default_channel())));
+								send_message_private($info["socket"], $response_text);
+								$response_text = mask(json_encode(array("type"=>"user_change_channel", "users"=>$clients_send_list, "channel"=>get_default_channel())));
+								send_message_can_subscribe($info["socket"], $channels_array[get_default_channel()], $response_text);
+							};
+						}
 					}else{
 						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
 						send_message_private($target_info["socket"], $response_text);
@@ -318,8 +385,9 @@
 					$target_channel = $channels_array[$id];
 					$name = $ws_msg->name;
 					if($is_admin){
-					$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"{$user_info["username"]} added channel '$name'")));
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"{$user_info["username"]} added channel '$name'")));
 						send_message($response_text);
+						echo "{$user_info["username"]} added channel '$name'\n";
 						
 						store_push_channels_down($target_channel["listorder"]);
 						$insert_id = store_channel($name, $target_channel["listorder"]+1, false, false, false, true);
@@ -357,11 +425,16 @@
 					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
 					$is_admin = $user_info["is_admin"];
 					$id = $ws_msg->id;
+					$target_channel = $channels_array[$id];
 					if($is_admin){
-						store_delete_channel($id);
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"{$user_info["username"]} deleted channel '{$target_channel["name"]}'")));
+						send_message($response_text);
+						echo "{$user_info["username"]} deleted channel '{$target_channel["name"]}'\n";
 						
 						$response_text = mask(json_encode(array("type"=>"remove_channel", "id"=>$id)));
 						send_message($response_text);
+						
+						store_delete_channel($id);
 						
 						$channels_array = [];
 						foreach(get_all_channels_by_order() as $key=>$value){

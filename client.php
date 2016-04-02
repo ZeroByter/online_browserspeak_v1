@@ -17,28 +17,31 @@
 	
 	<div id="channel_context_menu">
 		<div class="ctx_menu_btn">
-			<button id="cntx_switch_channel">Switch channel</button>
+			<button id="ctx_switch_channel">Switch channel</button>
 		</div>
 		<div class="ctx_menu_btn">
-			<button id="cntx_change_channel_name">Change channel name</button>
+			<button id="ctx_change_channel_name">Change channel name</button>
 		</div>
 		<div class="ctx_menu_btn">
-			<button id="cntx_add_channel_after">Add channel after</button>
+			<button id="ctx_add_channel_after">Add channel after</button>
 		</div>
 		<div class="ctx_menu_btn">
-			<button id="cntx_delete_channel">Delete channel</button>
+			<button id="ctx_delete_channel">Delete channel</button>
 		</div>
 		<div class="ctx_menu_btn">
 			<button>Make channel default</button>
 		</div>
 		<div class="ctx_menu_btn">
-			<button>Kick everyone out of channel</button>
+			<button id="ctx_kick_all_from_channel">Kick everyone out of channel</button>
 		</div>
 	</div>
 	
 	<div id="user_context_menu">
 		<div class="ctx_menu_btn">
-			<button id="ctx_kick_user">Kick user</button>
+			<button id="ctx_kick_user_server">Kick user from server</button>
+		</div>
+		<div class="ctx_menu_btn">
+			<button id="ctx_kick_user_channel">Kick user channel</button>
 		</div>
 		<div class="ctx_menu_btn">
 			<button id="ctx_bring_user">Bring user to channel</button>

@@ -31,4 +31,13 @@
 			return true;
 		}
 	}
+	
+	function get_channel_name($id){
+		global $channels_array;
+		foreach($channels_array as $i=>$channel){
+			if($channel["id"] == $id){
+				return $channel["name"];
+			}
+		}
+	}
 ?>

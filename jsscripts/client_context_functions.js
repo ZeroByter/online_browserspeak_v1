@@ -1,5 +1,5 @@
 //Channel context menu functions
-$("#cntx_switch_channel").click(function(){
+$("#ctx_switch_channel").click(function(){
 	if(own_channel_id != $(context_menu_target).data("id")){
 		var ws_msg = {
 			type: "user_change_channel",
@@ -12,7 +12,7 @@ $("#cntx_switch_channel").click(function(){
 	}
 })
 
-$("#cntx_add_channel_after").click(function(){
+$("#ctx_add_channel_after").click(function(){
 	//$("#chat_input").val("/add_channel_after " + $(context_menu_target).data("id") + " ")
 	//$("#chat_input").focus()
 	
@@ -27,7 +27,7 @@ $("#cntx_add_channel_after").click(function(){
 	}
 })
 
-$("#cntx_delete_channel").click(function(){
+$("#ctx_delete_channel").click(function(){
 	var ws_msg = {
 		type: "delete_channel",
 		id: $(context_menu_target).data("id"),
@@ -35,16 +35,32 @@ $("#cntx_delete_channel").click(function(){
 	websocket.send(JSON.stringify(ws_msg))
 })
 
-$("#cntx_change_channel_name").click(function(){
+$("#ctx_change_channel_name").click(function(){
 	$("#chat_input").val("/change_channel_name " + $(context_menu_target).data("id") + " ")
 	$("#chat_input").focus()
 })
 
 //User context menu functions
-$("#ctx_kick_user").click(function(){
+$("#ctx_kick_user_server").click(function(){
 	var ws_msg = {
-		type: "kick_user",
+		type: "kick_user_server",
 		target_name: $(context_menu_target).data("name"),
+	}
+	websocket.send(JSON.stringify(ws_msg))
+})
+
+$("#ctx_kick_user_channel").click(function(){
+	var ws_msg = {
+		type: "kick_user_channel",
+		target_name: $(context_menu_target).data("name"),
+	}
+	websocket.send(JSON.stringify(ws_msg))
+})
+
+$("#ctx_kick_all_from_channel").click(function(){
+	var ws_msg = {
+		type: "kick_all_from_channel",
+		channel: $(context_menu_target).data("id"),
 	}
 	websocket.send(JSON.stringify(ws_msg))
 })

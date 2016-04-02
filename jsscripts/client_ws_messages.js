@@ -26,6 +26,10 @@ ws_messages["error_message"] = function(ws_msg){
 	add_chat("error", "", ws_msg.message)
 }
 
+ws_messages["user_message"] = function(ws_msg){
+	add_chat("user", ws_msg.username, ws_msg.message)
+}
+
 ws_messages["channel_change_name"] = function(ws_msg){
 	$(".channel").each(function(){
 		if($(this).data("id") == ws_msg.id){
@@ -95,6 +99,7 @@ ws_messages["client_active_channel"] = function(ws_msg){
 		$(".channel").each(function(i, v){
 			if($(this).data("id") == ws_msg.channel){
 				$(this).addClass("active_channel")
+				own_channel_id = ws_msg.channel
 			}
 		})
 }
