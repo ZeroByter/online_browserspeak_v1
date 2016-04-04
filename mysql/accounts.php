@@ -9,7 +9,9 @@
 		sql_disconnect($conn);
 	}
 	
-	function does_identity_exist($identity){		
+	function does_identity_exist($identity){
+		$identity = mysql_real_escape_string($identity);
+		
 		$conn = sql_connect();
 		$stmt = mysqli_prepare($conn, "SELECT id FROM identities WHERE identity='$identity'");
 		mysqli_stmt_execute($stmt);
@@ -22,6 +24,8 @@
 	}
 	
 	function get_identity($identity){
+		$identity = mysql_real_escape_string($identity);
+		
 		$conn = sql_connect();
 		$stmt = mysqli_prepare($conn, "SELECT * FROM identities WHERE identity='$identity'");
 		mysqli_stmt_execute($stmt);
@@ -34,6 +38,10 @@
 	}
 	
 	function store_identity($username, $identity, $is_admin){
+		$username = mysql_real_escape_string($username);
+		$identity = mysql_real_escape_string($identity);
+		$is_admin = mysql_real_escape_string($is_admin);
+		
 		$conn = sql_connect();
 		$stmt = mysqli_prepare($conn, "INSERT INTO identities(username, identity, is_admin) VALUES ('$username', '$identity', '$is_admin')");
 		mysqli_stmt_execute($stmt);
@@ -42,6 +50,9 @@
 	}
 	
 	function store_identity_username($identity, $username){
+		$identity = mysql_real_escape_string($identity);
+		$username = mysql_real_escape_string($username);
+		
 		$conn = sql_connect();
 		$stmt1 = mysqli_prepare($conn, "UPDATE identities SET username='$username' WHERE identity='$identity'");
 		mysqli_stmt_execute($stmt1);
@@ -50,6 +61,9 @@
 	}
 	
 	function store_identity_is_admin($identity, $is_admin){
+		$identity = mysql_real_escape_string($identity);
+		$is_admin = mysql_real_escape_string($is_admin);
+		
 		$conn = sql_connect();
 		$stmt1 = mysqli_prepare($conn, "UPDATE identities SET is_admin='$is_admin' WHERE identity='$identity'");
 		mysqli_stmt_execute($stmt1);
