@@ -53,6 +53,17 @@
 		return true;
 	}
 
+	function send_message_admin_only($msg){
+		global $clients_info;
+		global $channels_array;
+		foreach($clients_info as $sessionid=>$info){
+			if($info["is_admin"]){
+				@socket_write(get_sessionid_socket($sessionid),$msg,strlen($msg));
+			}
+		}
+		return true;
+	}
+
 	function send_message_to_channel($send_channel, $msg){
 		global $clients_info;
 		foreach($clients_info as $sessionid=>$info){

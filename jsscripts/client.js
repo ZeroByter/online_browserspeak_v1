@@ -71,13 +71,17 @@ websocket.onmessage = function(event){ //When a websocket message is received
 	ws_messages[type](ws_msg)
 }
 
-function add_channel(name, listorder, id, active_channel, xss_protected){ //Add a channel to the channels div
+function add_channel(name, listorder, id, active_channel, channel_info){ //Add a channel to the channels div
 	var active_channel_str = ""
 	if(active_channel){
 		active_channel_str = "active_channel"
 	}
-	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"  data-xss-secure=\"" + xss_protected + "\">" + name + "</span><span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"></span>")
-	//$("#channels_div").append("<span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"></span>")
+	is_secure = channel_info["is_secure"]
+	is_default = channel_info["default"]
+	enter_admin_only = channel_info["enter_admin_only"]
+	subscribe_admin_only = channel_info["subscribe_admin_only"]
+	requires_password = channel_info["requires_password"]
+	$("#channels_div").append("<span class=\"channel " + active_channel_str + "\" data-channel-name=\"" + name + "\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"  data-xss-secure=\"" + is_secure + "\" data-is-default=\"" + is_default + "\" data-enter-admin-only=\"" + enter_admin_only + "\" data-subscribe-admin-only=\"" + subscribe_admin_only + "\" data-requires-password=\"" + requires_password + "\">" + name + "</span><span class=\"channel_users\" data-id=\"" + id + "\" data-listorder=\"" + listorder + "\"></span>")
 }
 
 function insert_channel_after(after_order, name, channel_listorder, id, is_secure){ //Add a channel to the channels div after a specific channel
@@ -111,7 +115,6 @@ function user_change_is_admin(id, is_admin){
 	$(".user").each(function(){
 		if($(this).data("id") == id){
 			$(this).data("is-admin", is_admin)
-			console.log($(this).data("is-admin"))
 		}
 	})
 }
@@ -157,11 +160,18 @@ $("body").on("click", ".user", function(e){
 
 $("body").on("click", ".channel", function(e){
 	var name = $(e.target).data("channel-name")
+	var is_default = $(e.target).data("is-default")
 	var is_secure = $(e.target).data("xss-secure")
-	if(is_secure == 1){
-		is_secure = "yes"
-	}else{
-		is_secure = "no"
+	var subscribe_admin_only = $(e.target).data("subscribe-admin-only")
+	var enter_admin_only = $(e.target).data("enter-admin-only")
+	var requires_password = $(e.target).data("requires-password")
+	
+	function get_bool(input){
+		if(input == 1){
+			return "yes"
+		}else{
+			return "no"
+		}
 	}
 	var users_inside
 	$(".channel_users").each(function(i, v){
@@ -172,18 +182,33 @@ $("body").on("click", ".channel", function(e){
 	
 	$("#information_div").html("")
 	$("#information_div").append("Channel name: " + name + "<br>")
-	$("#information_div").append("Is XSS protected: " + is_secure + "<br>")
+	$("#information_div").append("Requires password: " + get_bool(requires_password) + "<br>")
+	$("#information_div").append("Is default channel: " + get_bool(is_default) + "<br>")
+	$("#information_div").append("Is channel enterable only for admins: " + get_bool(enter_admin_only) + "<br>")
+	$("#information_div").append("Is channel visible only for admins: " + get_bool(subscribe_admin_only) + "<br>")
 	$("#information_div").append("Users inside: " + users_inside + "<br>")
 })
 
 $("body").on("dblclick", ".channel:not(.active_channel)", function(){
 	if(own_channel_id != $(this).data("id")){
-		var ws_msg = {
-			type: "user_change_channel",
-			channel: $(this).data("id"),
+		if($(this).data("requires-password")){
+			var password = prompt("Please enter password")
+			if(password){
+				var ws_msg = {
+					type: "user_change_channel",
+					channel: $(this).data("id"),
+					password: password,
+				}
+				websocket.send(JSON.stringify(ws_msg))
+			}
+		}else{
+			var ws_msg = {
+				type: "user_change_channel",
+				channel: $(this).data("id"),
+				password: "",
+			}
+			websocket.send(JSON.stringify(ws_msg))
 		}
-		websocket.send(JSON.stringify(ws_msg))
-		own_channel_id = $(this).data("id")
 	}
 })
 $("body").mousedown(function(e){
@@ -357,7 +382,7 @@ $("#chat_input").bind("keypress", function(e){ //When a user sends a message via
 	}
 })
 
-var mouse_pos_x, mouse_pos_y, context_menu_pos_x, context_menu_pos_y, context_menu_target
+var mouse_pos_x, mouse_pos_y, context_menu_pos_x, context_menu_pos_y, context_submenu_pos_x, context_submenu_pos_y, context_menu_target
 $("body").mousemove(function(event){
 	mouse_pos_x = event.pageX
 	mouse_pos_y = event.pageY
@@ -377,10 +402,25 @@ document.addEventListener("contextmenu", function(e){
 		context_menu_pos_x = mouse_pos_x
 		context_menu_pos_y = mouse_pos_y
 		
+		$(".ctx_menu_btn").each(function(i, v){
+			if($(v).data("admin-only")){
+				if(is_admin){
+					$(v).attr("disabled", false)
+				}else{
+					$(v).attr("disabled", true)
+				}
+			}
+		})
+		
 		if(own_channel_id == $(target).data("id")){
-			$("#cntx_switch_channel").css("display", "none")
+			$("#ctx_switch_channel").attr("disabled", true)
 		}else{
-			$("#cntx_switch_channel").css("display", "inherit")
+			$("#ctx_switch_channel").attr("disabled", false)
+		}
+		if($(target).data("requires-password") == 1){
+			$("#ctx_remove_channel_password").attr("disabled", false)
+		}else{
+			$("#ctx_remove_channel_password").attr("disabled", true)
 		}
 		
 		e.preventDefault()
@@ -401,22 +441,35 @@ setInterval(function(){
 	if(mouse_pos_x < context_menu_pos_x - 50){
 		$("#channel_context_menu").css("display", "none")
 		$("#user_context_menu").css("display", "none")
+		$("#channel_context_submenu_permissions").css("display", "none")
 	}
-	if(mouse_pos_x > context_menu_pos_x + 250){
+	var menu_width = 200
+	if($("#channel_context_submenu_permissions").css("display") == "block"){
+		menu_width = 400
+	}
+	if(mouse_pos_x > context_menu_pos_x + menu_width + 50){
 		$("#channel_context_menu").css("display", "none")
 		$("#user_context_menu").css("display", "none")
+		$("#channel_context_submenu_permissions").css("display", "none")
+	}
+	if(mouse_pos_y < context_submenu_pos_y - 50){
+		$("#channel_context_submenu_permissions").css("display", "none")
 	}
 }, 100)
 
-$(".ctx_menu_btn button").click(function(){
-	$("#channel_context_menu").css("display", "none")
-	$("#user_context_menu").css("display", "none")
+$("#ctx_permissions_submenu_div").bind("mouseover", function(){
+	$("#channel_context_submenu_permissions").css("display", "block")
+	$("#channel_context_submenu_permissions").css("left", context_menu_pos_x + 208)
+	$("#channel_context_submenu_permissions").css("top", $("#ctx_permissions_submenu_div").offset().top)
+	context_submenu_pos_x = mouse_pos_x
+	context_submenu_pos_y = mouse_pos_y
 })
 
 $(document).click(function(e){
 	setTimeout(function(){
 		$("#channel_context_menu").css("display", "none")
 		$("#user_context_menu").css("display", "none")
+		$("#channel_context_submenu_permissions").css("display", "none")
 	}, 10)
 })
 

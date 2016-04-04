@@ -11,6 +11,7 @@
 	$start_time = time();
 	echo "started on $host:$port at $start_time\n";
 	$null = NULL;
+	$read_limit = 2048;
 
 	$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 
@@ -25,19 +26,25 @@
 	$clients_info = array();
 	$channels_array = [];
 	
-	foreach(get_all_channels_by_order() as $key=>$value){
-		if(isset($value->id)){
-			$channels_array[$value->id] = [
-				"id" => $value->id,
-				"name" => $value->name,
-				"listorder" => $value->listorder,
-				"default" => $value->is_default,
-				"subscribe_admin_only" => $value->subscribe_admin_only,
-				"enter_admin_only" => $value->enter_admin_only,
-				"is_secure" => $value->is_secure,
-			];
+	function redo_channels_array(){
+		global $channels_array;
+		$channels_array = [];
+		foreach(get_all_channels_by_order() as $key=>$value){
+			if(isset($value->id)){
+				$channels_array[$value->id] = [
+					"id" => $value->id,
+					"name" => $value->name,
+					"listorder" => $value->listorder,
+					"default" => $value->is_default,
+					"subscribe_admin_only" => $value->subscribe_admin_only,
+					"enter_admin_only" => $value->enter_admin_only,
+					"requires_password" => $value->requires_password,
+					"password" => $value->password,
+				];
+			}
 		}
 	}
+	redo_channels_array();
 	
 	while(true) {
 		$changed = $clients;
@@ -45,7 +52,7 @@
 		
 		if(in_array($socket, $changed)){
 			$socket_new = socket_accept($socket);
-			$header = socket_read($socket_new, 1024);
+			$header = socket_read($socket_new, $read_limit);
 			$user_identity = urldecode(explode("id:", strtok($header, "\r\n"))[1]);
 			$username = urldecode(explode("username:", strtok($header, "\r\n"))[1]);
 			if($username == ""){
@@ -116,12 +123,17 @@
 		}
 		
 		foreach($changed as $changed_socket){
-			while(socket_recv($changed_socket, $buf, 1024, 0) >= 1)
+			while(socket_recv($changed_socket, $buf, $read_limit, 0) >= 1)
 			{
 				socket_getpeername($changed_socket, $ip);
 				$received_text = unmask($buf);
 				$ws_msg = json_decode($received_text);
 				@$ws_type = $ws_msg->type;
+				$debug = false;
+				
+				if($debug && isset($ws_type)){
+					echo "message received: $ws_type\n";
+				}
 				
 				if($ws_type == "test"){
 					var_dump($channels_array);
@@ -155,10 +167,8 @@
 					$chat_message = $ws_msg->message;
 					$username = get_sessionid_user_info(get_socket_sessionid($changed_socket))["username"];
 					
-					if($channel_props["is_secure"]){
-						$chat_message = str_replace("<", "&lt;", $chat_message);
-						$chat_message = str_replace(">", "&gt;", $chat_message);
-					}
+					$chat_message = str_replace("<", "&lt;", $chat_message);
+					$chat_message = str_replace(">", "&gt;", $chat_message);
 					
 					$response_text = mask(json_encode(array("type"=>$ws_type, "username"=>$username, "message"=>$chat_message)));
 					send_message_to_channel($user_channel, $response_text);
@@ -214,10 +224,16 @@
 					
 					if($is_admin){
 						$target_info = get_user_by_name($ws_msg->target_name);
+						$target_channel = $channels_array[$target_info["channel"]];
 						$response_text = mask(json_encode(array("type"=>"kick_message", "message"=>"Kicked from the channel by $username.")));
 						send_message_private($target_info["socket"], $response_text);
-						
 						echo "{$target_info["username"]} was kicked from the channel '" . get_channel_name($target_info["channel"]) . "' by $username!\n";
+						if($target_channel["subscribe_admin_only"]){
+							if(!$target_info["is_admin"]){
+								$response_text = mask(json_encode(array("type"=>"clear_channel_users", "channel"=>$target_channel["id"])));
+								send_message_private($target_info["socket"], $response_text);
+							}
+						}
 						
 						$clients_info[get_socket_sessionid($target_info["socket"])]["channel"] = get_default_channel();
 						
@@ -357,6 +373,7 @@
 				
 				if($ws_type == "change_channel_name"){
 					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$username = $user_info["username"];
 					$id = $ws_msg->id;
 					$new_name = $ws_msg->name;
 					$is_admin = $clients_info[get_socket_sessionid($changed_socket)]["is_admin"];
@@ -365,13 +382,13 @@
 						$old_name = $channels_array[$id]["name"];
 						$channels_array[$id]["name"] = $new_name;
 						store_channel_name($id, $new_name);
+						redo_channels_array();
 						
 						$response_text = mask(json_encode(array("type"=>$ws_type, "id"=>$id, "name"=>$new_name)));
 						send_message($response_text);
-						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"User {$user_info["username"]} changed channel's '$old_name' name to '$new_name'")));
-						send_message_but_local($changed_socket, $response_text);
-						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"Channel '$old_name' changed to '$new_name'")));
-						send_message_private($changed_socket, $response_text);
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username changed channel's '$old_name' name to '$new_name'")));
+						send_message($response_text);
+						echo "$username changed channel's '$old_name' name to '$new_name'\n";
 					}else{
 						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
 						send_message_private($changed_socket, $response_text);
@@ -397,24 +414,10 @@
 							"name"=>$name,
 							"listorder"=>$target_channel["listorder"]+1,
 							"id"=>$insert_id,
-							"is_secure"=>true,
 						)));
 						send_message($response_text);
 						
-						$channels_array = [];
-						foreach(get_all_channels_by_order() as $key=>$value){
-							if(isset($value->id)){
-								$channels_array[$value->id] = [
-									"id" => $value->id,
-									"name" => $value->name,
-									"listorder" => $value->listorder,
-									"default" => $value->is_default,
-									"subscribe_admin_only" => $value->subscribe_admin_only,
-									"enter_admin_only" => $value->enter_admin_only,
-									"is_secure" => $value->is_secure,
-								];
-							}
-						}
+						redo_channels_array();
 					}else{
 						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
 						send_message_private($changed_socket, $response_text);
@@ -436,19 +439,164 @@
 						
 						store_delete_channel($id);
 						
-						$channels_array = [];
-						foreach(get_all_channels_by_order() as $key=>$value){
-							if(isset($value->id)){
-								$channels_array[$value->id] = [
-									"id" => $value->id,
-									"name" => $value->name,
-									"listorder" => $value->listorder,
-									"default" => $value->is_default,
-									"subscribe_admin_only" => $value->subscribe_admin_only,
-									"enter_admin_only" => $value->enter_admin_only,
-									"is_secure" => $value->is_secure,
-								];
-							}
+						redo_channels_array();
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				
+				if($ws_type == "make_channel_default"){
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$username = $user_info["username"];
+					$is_admin = $user_info["is_admin"];
+					$id = $ws_msg->id;
+					$target_channel = $channels_array[$id];
+					if($is_admin){
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username made '{$target_channel["name"]}' the default channel")));
+						send_message($response_text);
+						echo "$username made '{$target_channel["name"]}' the default channel\n";
+						
+						$response_text = mask(json_encode(array("type"=>$ws_type, "id"=>$id)));
+						send_message($response_text);
+						
+						store_channel_make_default($id);
+						
+						redo_channels_array();
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				
+				if($ws_type == "change_channel_password"){
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$username = $user_info["username"];
+					$is_admin = $user_info["is_admin"];
+					$id = $ws_msg->id;
+					$target_channel = $channels_array[$id];
+					$curr_password = $target_channel["password"];
+					$new_password = $ws_msg->password;
+					if($is_admin){
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username changed '{$target_channel["name"]}'s password to '****'")));
+						send_message_but_local($changed_socket, $response_text);
+						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username changed '{$target_channel["name"]}'s password to '$new_password'")));
+						send_message_private($changed_socket, $response_text);
+						$response_text = mask(json_encode(array("type"=>$ws_type, "id"=>$id)));
+						send_message($response_text);
+						
+						echo "$username changed '{$target_channel["name"]}'s password to '$new_password'\n";
+						
+						store_channel_change_password($id, $new_password);
+						
+						redo_channels_array();
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				
+				if($ws_type == "remove_channel_password"){
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$username = $user_info["username"];
+					$is_admin = $user_info["is_admin"];
+					$id = $ws_msg->id;
+					$target_channel = $channels_array[$id];
+					if($is_admin){
+						if($target_channel["requires_password"]){
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username removed '{$target_channel["name"]}'s password")));
+							send_message($response_text);
+							$response_text = mask(json_encode(array("type"=>$ws_type, "id"=>$id)));
+							send_message($response_text);
+							
+							echo "$username removed '{$target_channel["name"]}'s password\n";
+							
+							store_channel_remove_password($id);
+							
+							redo_channels_array();
+						}else{
+							$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Channel already has no password!")));
+							send_message_private($changed_socket, $response_text);
+						}
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				
+				if($ws_type == "toggle_admin_enter_only"){
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$username = $user_info["username"];
+					$is_admin = $user_info["is_admin"];
+					$id = $ws_msg->id;
+					$target_channel = $channels_array[$id];
+					if($is_admin){
+						if($target_channel["enter_admin_only"]){
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username turned off entry for admins only in channel '{$target_channel["name"]}'")));
+							send_message($response_text);
+							echo "$username turned off entry for admins only in channel '{$target_channel["name"]}'\n";
+						}else{
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username turned on entry for admins only in channel '{$target_channel["name"]}'")));
+							send_message($response_text);
+							echo "$username turned on entry for admins only in channel '{$target_channel["name"]}'\n";
+						}
+						
+						$response_text = mask(json_encode(array("type"=>$ws_type, "id"=>$id, "state"=>!$target_channel["enter_admin_only"])));
+						send_message($response_text);
+						
+						store_channel_toggle_admin_enter_only($id);
+						
+						redo_channels_array();
+					}else{
+						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
+						send_message_private($changed_socket, $response_text);
+					}
+				}
+				
+				if($ws_type == "toggle_subscribe_enter_only"){
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$username = $user_info["username"];
+					$is_admin = $user_info["is_admin"];
+					$id = $ws_msg->id;
+					$target_channel = $channels_array[$id];
+					if($is_admin){
+						if($target_channel["subscribe_admin_only"]){
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username turned off subscription for admins only in channel '{$target_channel["name"]}'")));
+							send_message($response_text);
+							echo "$username turned off subscription for admins only in channel '{$target_channel["name"]}'\n";
+						}else{
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username turned on subscription for admins only in channel '{$target_channel["name"]}'")));
+							send_message($response_text);
+							echo "$username turned on subscription for admins only in channel '{$target_channel["name"]}'\n";
+						}
+						
+						$response_text = mask(json_encode(array("type"=>$ws_type, "id"=>$id, "state"=>!$target_channel["subscribe_admin_only"])));
+						send_message($response_text);
+						
+						store_channel_toggle_admin_subscribe_only($id);
+						redo_channels_array();
+						$target_channel = $channels_array[$id];
+						
+						$clients_send_list = [];
+						foreach($clients_info as $sessiondid=>$info){
+							if(!can_user_subscribe_channel($info, $target_channel)){
+								$response_text = mask(json_encode(array("type"=>"clear_channel_users", "channel"=>$id)));
+								send_message_private($info["socket"], $response_text);
+							}else{
+								$username = $info["username"];
+								if($info["is_admin"]){
+									$username = "<b>" . $info["username"] . " [Admin]</b>";
+								}
+								if($info["channel"] == $id){
+									$clients_send_list[] = [
+										"username" => $username,
+										"id" => $info["uid"],
+										"is_admin" => $info["is_admin"],
+									];
+								}
+								$response_text = mask(json_encode(array("type"=>"get_users_in_channel", "users"=>$clients_send_list, "channel"=>$id)));
+								send_message_private($info["socket"], $response_text);
+							};
 						}
 					}else{
 						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions for this command!")));
@@ -488,55 +636,102 @@
 				}
 				
 				if($ws_type == "user_change_channel"){
-					$uid = $clients_info[get_socket_sessionid($changed_socket)]["uid"];
-					$username = $clients_info[get_socket_sessionid($changed_socket)]["username"];
-					$old_channel = $clients_info[get_socket_sessionid($changed_socket)]["channel"];
-					$channel_name = $channels_array[$ws_msg->channel]["name"];
+					$user_info = $clients_info[get_socket_sessionid($changed_socket)];
+					$uid = $user_info["uid"];
+					$username = $user_info["username"];
+					$old_channel = $user_info["channel"];
+					$is_admin = $user_info["is_admin"];
+					$target_channel = $channels_array[$ws_msg->channel];
+					$channel_name = $target_channel["name"];
+					$password = $ws_msg->password;
+					$can_join = true;
 					
-					if(can_user_join_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel])){
-						$clients_info[get_socket_sessionid($changed_socket)]["channel"] = $ws_msg->channel;
-						echo "($ip) $username: switched to channel '$channel_name'\n";
-						$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username joined channel '$channel_name'")));
-						send_message($response_text);
-					}else{
-						$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions to connect to channel '$channel_name'")));
-						send_message_private($changed_socket, $response_text);
-						echo "($ip) $username tried to switch to channel '$ws_msg->channel' and was denied\n";
-					}
-					
-					$clients_send_list = [];
-					
-					foreach($clients_info as $sessiondid=>$info){
-						if($info["channel"] == $ws_msg->channel){
-							$username = $info["username"];
-							if($info["is_admin"]){
-								$username = "<b>" . $info["username"] . " [Admin]</b>";
+					if($target_channel["requires_password"]){
+						if($password == $target_channel["password"]){
+							$can_join = true;
+						}else{
+							if($is_admin){
+								if($password == "skip"){
+									$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"Used skip password permission to skip channel password verificiation")));
+									send_message_private($changed_socket, $response_text);
+									$can_join = true;
+								}else{
+									$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Incorrect password to join channel ($password). As admin you can enter in 'skip' in the password field to skip password verification")));
+									send_message_private($changed_socket, $response_text);
+									echo "$username tried to join password-protected channel '$channel_name' and failed ($password)\n";
+									$can_join = false;
+								}
+							}else{
+								$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Incorrect password to join channel ($password)")));
+								send_message_private($changed_socket, $response_text);
+								echo "$username tried to join password-protected channel '$channel_name' and failed ($password)\n";
+								$can_join = false;
 							}
-							$clients_send_list[] = [
-								"username" => $username,
-								"id" => $info["uid"],
-								"is_admin" => $info["is_admin"],
-							];
-						};
+						}
+					}else{
+						$can_join = true;
 					}
 					
-					if(can_user_join_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel])){
-						$response_text = mask(json_encode(array("type"=>"client_active_channel", "channel"=>$ws_msg->channel)));
-						send_message_private($changed_socket, $response_text);
-						$response_text = mask(json_encode(array("type"=>"remove_user", "id"=>$uid)));
-						send_message($response_text);
-						$response_text = mask(json_encode(array("type"=>$ws_type, "users"=>$clients_send_list, "channel"=>$ws_msg->channel)));
-						send_message_can_subscribe($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel], $response_text);
-						if(!can_user_subscribe_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$old_channel])){
-							$response_text = mask(json_encode(array("type"=>"clear_channel_users", "channel"=>$old_channel)));
+					if($can_join){
+						if(can_user_join_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel])){
+							$clients_info[get_socket_sessionid($changed_socket)]["channel"] = $ws_msg->channel;
+							echo "($ip) $username: switched to channel '$channel_name'\n";
+							$response_text = mask(json_encode(array("type"=>"system_message", "message"=>"$username joined channel '$channel_name'")));
+							send_message($response_text);
+						}else{
+							$response_text = mask(json_encode(array("type"=>"error_message", "message"=>"Invalid permissions to connect to channel '$channel_name'")));
 							send_message_private($changed_socket, $response_text);
+							echo "($ip) $username tried to switch to channel '$ws_msg->channel' and was denied\n";
+						}
+						
+						$clients_send_list = [];
+						
+						foreach($clients_info as $sessiondid=>$info){
+							if($info["channel"] == $ws_msg->channel){
+								$username = $info["username"];
+								if($info["is_admin"]){
+									$username = "<b>" . $info["username"] . " [Admin]</b>";
+								}
+								$clients_send_list[] = [
+									"username" => $username,
+									"id" => $info["uid"],
+									"is_admin" => $info["is_admin"],
+								];
+							};
+						}
+						
+						if(can_user_join_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel])){
+							$response_text = mask(json_encode(array("type"=>"client_active_channel", "channel"=>$ws_msg->channel)));
+							send_message_private($changed_socket, $response_text);
+							$response_text = mask(json_encode(array("type"=>"remove_user", "id"=>$uid)));
+							send_message($response_text);
+							$response_text = mask(json_encode(array("type"=>$ws_type, "users"=>$clients_send_list, "channel"=>$ws_msg->channel)));
+							send_message_can_subscribe($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$ws_msg->channel], $response_text);
+							if(!can_user_subscribe_channel($clients_info[get_socket_sessionid($changed_socket)], $channels_array[$old_channel])){
+								$response_text = mask(json_encode(array("type"=>"clear_channel_users", "channel"=>$old_channel)));
+								send_message_private($changed_socket, $response_text);
+							}
 						}
 					}
 				}
 				
 				if($ws_type == "get_channels"){
+					$send_channel_array = [];
+					
+					foreach($channels_array as $id=>$info){
+						$send_channel_array[$id] = [
+							"id"=>$info["id"],
+							"name"=>$info["name"],
+							"listorder"=>$info["listorder"],
+							"default"=>$info["default"],
+							"subscribe_admin_only"=>$info["subscribe_admin_only"],
+							"enter_admin_only"=>$info["enter_admin_only"],
+							"requires_password"=>$info["requires_password"],
+						];
+					}
+					
 					$channel = $clients_info[get_socket_sessionid($changed_socket)]["channel"];
-					$response_text = mask(json_encode(array("type"=>$ws_type, "channels"=>$channels_array, "active_channel"=>$channel)));
+					$response_text = mask(json_encode(array("type"=>$ws_type, "channels"=>$send_channel_array, "active_channel"=>$channel)));
 					send_message_private($changed_socket, $response_text);
 					echo "($ip) requested to get a list of channels\n";
 				}
@@ -566,7 +761,7 @@
 				break 2;
 			}
 			
-			$buf = @socket_read($changed_socket, 1024, PHP_NORMAL_READ);
+			$buf = @socket_read($changed_socket, $read_limit, PHP_NORMAL_READ);
 			if($buf === false){
 				socket_getpeername($changed_socket, $ip);
 				

@@ -93,7 +93,7 @@ body{
 	margin-left: -1px;
 }
 
-#channel_context_menu, #user_context_menu{
+#channel_context_menu, #user_context_menu, #channel_context_submenu_permissions{
 	display: none;
 	background: #E9E9E9;
 	position: absolute;
@@ -104,7 +104,7 @@ body{
 	box-shadow: 4px 4px 10px #888888;
 }
 
-.ctx_menu_btn button{
+.ctx_menu_div button{
 	padding: 0px;
 	text-align: left;
 	background: none;
@@ -113,16 +113,17 @@ body{
 	display: inherit;
 	font: inherit;
 	outline: none;
-	cursor: pointer;
 	width: 192px;
+	cursor: pointer;
 }
 
-.ctx_menu_btn{
-	margin: 3px 0px;
-	padding: 0px 4px;
+.ctx_menu_div,.ctx_menu_submenu{
+	margin: 5px 0px;
+	padding: 2px 4px;
+	cursor: pointer;
 }
 
-.ctx_menu_btn:hover{
+.ctx_menu_div:hover,.ctx_menu_submenu:hover{
 	background: #CFCFCF;
 	border-radius: 4px;
 }
