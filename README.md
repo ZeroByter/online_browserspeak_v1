@@ -1,5 +1,5 @@
-# online_teamspeak_v1
-This a project to bring the commonly used 'TeamSpeak 3' desktop program to the browser, no need to host a ts3 server and connecting to it from the browser, I mean an actual whole 'teamspeak like' websocket server run by 100% browser power.
+# online_browserspeak_v1
+This a project to an application thats commonly called as the 'TeamSpeak 3' desktop program to the browser, no need to host a ts3 server and connecting to it from the browser, I mean an actual whole 'teamspeak like' websocket server run by 100% browser power.
 
 # Is there voice communication for version 1?
 No, for now version 1 is all about focusing on perfecting the app, but once it is done, version 2 will be worked on and the entire mission of version 2 is to add microphone voice communication, maybe we will rewrite the entire thing from scratch if needed.
